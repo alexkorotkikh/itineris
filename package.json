@@ -1,0 +1,97 @@
+{
+    "name": "figo-router",
+    "version": "0.1.0",
+    "description": "",
+    "main": "dist/collector.js",
+    "engines": {
+      "node": ">=6.9.5"
+    },
+    "scripts": {
+      "clean": "rimraf dist",
+      "prebuild": "npm run clean",
+      "build": "tsc",
+      "build:watch": "tsc-watch server.ts --outDir ./dist --onSuccess 'node ./dist/server.ts'",
+      "start": "nodemon ./dist/collector.js",
+      "pretest": "npm run build",
+      "lint": "tslint --project .",
+      "test": "mocha test/setup dist/test/target-test.js dist/test/*-test.js",
+      "changelog": "conventional-changelog -p angular -i CHANGELOG.md -w",
+      "preversion": "npm test",
+      "version": "npm run build && conventional-changelog -p angular -v -r 0 > CHANGELOG.md && git add -A .",
+      "postversion": "git push && git push --tags",
+      "prepublish": "not-in-install && npm run build || echo 'In install cycle, skipping prepublish'"
+    },
+    "repository": {
+      "type": "git",
+      "url": "mabels/sla-clock"
+    },
+    "license": "AFL-2.0",
+    "bugs": {
+      "url": "https://github.com/mabels/sla-clock/issues"
+    },
+    "homepage": "https://github.com/mabels/sla-clock#readme",
+    "devDependencies": {
+      "@types/chai": "^4.0.3",
+      "@types/express": "^4.0.36",
+      "@types/mocha": ">=2.2.33",
+      "@types/ws": "^3.0.2",
+      "awesome-typescript-loader": ">=3.0.0",
+      "css-loader": ">=0.23.1",
+      "extract-text-webpack-plugin": ">=2.0.0-rc.3",
+      "file-loader": ">=0.9.0",
+      "html-webpack-plugin": ">=2.24.0",
+      "img-loader": ">=1.3.1",
+      "less": ">=2.7.1",
+      "less-loader": ">=2.2.3",
+      "chai": "^4.1.1",
+      "globby": ">=5.0.0",
+      "in-publish": ">=2.0.0",
+      "mocha": ">=2.5.3",
+      "nodemon": ">=1.9.2",
+      "rimraf": "^2.6.1",
+      "source-map-support": ">=0.4.1",
+      "ts-loader": "^2.3.2",
+      "tsc-watch": "^1.0.7",
+      "tslint": "^5.6.0",
+      "typescript": ">=2.1.5",
+      "url-loader": ">=0.5.7",
+      "webpack": "^3.5.4"
+    },
+    "dependencies": {
+      "@types/classnames": ">=0.0.32",
+      "@types/fs-extra": ">=3.0.0",
+      "@types/node-uuid": ">=0.0.28",
+      "@types/request-promise": "^4.1.36",
+      "@types/sequelize": "^4.0.68",
+      "@types/uuid": "^3.4.0",
+      "@types/winston": ">=0.0.32",
+      "@types/yargs": "^8.0.2",
+      "@types/react": ">=0.14.35",
+      "@types/react-dom": ">=0.14.19",
+      "express": "^4.15.4",
+      "fs-extra": ">=3.0.1",
+      "node-uuid": ">=1.4.7",
+      "pg": "^7.1.2",
+      "promise-etcd": ">=1.0.7-5",
+      "react": ">=15.4.1",
+      "react-dom": ">=15.4.1",
+      "reflect-metadata": "^0.1.10",
+      "request": "^2.81.0",
+      "request-promise": "^4.2.1",
+      "rxjs": "^5.4.3",
+      "rxjs-exec": "^0.4.1",
+      "sequelize": "^4.4.3",
+      "sequelize-typescript": "^0.3.5",
+      "winston": ">=2.2.0",
+      "ws": "^3.1.0",
+      "yargs": "^8.0.2"
+    },
+    "publishConfig": {
+      "tag": "next"
+    },
+    "config": {
+      "commitizen": {
+        "path": "./node_modules/cz-conventional-changelog"
+      }
+    }
+  }
