@@ -15,7 +15,7 @@ describe('router', function () {
 
     it('show version', (done) => {
         router.cli(['version']).subscribe((version) => {
-            assert.equal(version, '1.0');
+            assert.equal(version, '0.1.0');
             done();
         });
     });
