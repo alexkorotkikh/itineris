@@ -1,5 +1,5 @@
 {
-    "name": "figo-router",
+    "name": "router",
     "version": "0.1.0",
     "description": "",
     "main": "dist/collector.js",

@@ -7,7 +7,7 @@ export class EtcdDaemon {
 
     public static start(): EtcdDaemon {
         let ret = new EtcdDaemon();
-        ret.etcdir = fs.mkdtempSync('figo-router-test-');
+        ret.etcdir = fs.mkdtempSync('router-test-');
         console.log('CREATED:', ret.etcdir);
         ret.etcd = cp.spawn('etcd', ['--data-dir', ret.etcdir]);
         ret.etcd.on('error', (err) => {
