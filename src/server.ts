@@ -1,5 +1,8 @@
 import * as http from 'http';
 import * as winston from 'winston';
+import * as etcd from 'promise-etcd';
+
+import { EndpointInfo } from "./endpoints";
 
 const logger = new (winston.Logger)({
     transports: [
@@ -12,13 +15,25 @@ function requestHandler(request: http.IncomingMessage,
     logger.debug(request.url);
 }
 
-const server = http.createServer(requestHandler);
-const port = process.env.PORT;
+function loadEndpointsConfiguration(etc: etcd.Etcd) {
+    etc.list('', { recursive: true }).then((val) => {
+        val.value.map((service) => EndpointInfo.create(service))
+    });
+}
 
-server.listen(port, (err: any) => {
-    if (err) {
-        return logger.error('something bad happened', err);
-    }
+function detectPort() {
+    return process.env.PORT;
+}
 
-    logger.info(`server is listening on ${port}`);
-});
+export function startServer(etc: etcd.Etcd): void {
+    const server = http.createServer(requestHandler);
+    const port = detectPort();
+    server.listen(port, (err: any) => {
+        if (err) {
+            return logger.error('Something bad happened', err);
+        }
+
+        loadEndpointsConfiguration(etc);
+        logger.info(`Server is listening on ${port}`);
+    });
+}

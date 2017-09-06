@@ -4,6 +4,8 @@ import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as yargs from 'yargs';
 
+import * as server from './server';
+
 const etcdOptions = {
     'etcd-cluster-id': {
         default: 'ClusterWorld'
@@ -36,6 +38,7 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
     y.command('start', 'Starts router', etcdOptions, (argv: any) => {
         const etc = createEtcd(argv);
         etc.connect().then(() => {
+            server.startServer(etc);
             observer.next('Router started');
             observer.complete();
         }).catch((error) => {
