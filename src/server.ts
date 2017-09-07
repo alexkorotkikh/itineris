@@ -4,6 +4,8 @@ import * as etcd from 'promise-etcd';
 
 import { EndpointInfo } from "./endpoints";
 
+let endpoints: EndpointInfo[];
+
 const logger = new (winston.Logger)({
     transports: [
         new (winston.transports.Console)(),
@@ -13,11 +15,14 @@ const logger = new (winston.Logger)({
 function requestHandler(request: http.IncomingMessage,
                         response: http.ServerResponse): void {
     logger.debug(request.url);
+    if (!endpoints) {
+        logger.error("Endpoints were not loaded")
+    }
 }
 
 function loadEndpointsConfiguration(etc: etcd.Etcd) {
     etc.list('', { recursive: true }).then((val) => {
-        val.value.map((service) => EndpointInfo.create(service))
+        endpoints = val.value.map((service) => EndpointInfo.create(service));
     });
 }
 
