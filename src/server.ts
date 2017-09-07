@@ -12,12 +12,48 @@ const logger = new (winston.Logger)({
     ]
 });
 
+function getForwardHost() {
+    return "";
+}
+
+function getForwardPort() {
+    return "";
+}
+
 function requestHandler(request: http.IncomingMessage,
                         response: http.ServerResponse): void {
     logger.debug(request.url);
+
     if (!endpoints) {
         logger.error("Endpoints were not loaded")
     }
+
+    const forwardOptions = {
+        host: getForwardHost(),
+        port: getForwardPort(),
+        path: request.url,
+        method: request.method,
+        headers: request.headers,
+    };
+    const forward = http.request(forwardOptions, (cres) => {
+        cres.on('data', (chunk) => {
+            response.write(chunk);
+        });
+        cres.on('close', () => {
+            response.writeHead(cres.statusCode);
+            response.end();
+        });
+        cres.on('end', () => {
+            response.writeHead(cres.statusCode);
+            response.end();
+        });
+    }).on('error', (e) => {
+        logger.error(e.message);
+        response.writeHead(500);
+        response.end();
+    });
+
+    forward.end()
 }
 
 function loadEndpointsConfiguration(etc: etcd.Etcd) {
