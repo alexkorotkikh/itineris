@@ -27,7 +27,7 @@ function loadEndpointsConfiguration(etc: etcd.Etcd) {
 }
 
 function detectPort() {
-    return process.env.PORT;
+    return process.env.PORT || 80;
 }
 
 export function startServer(etc: etcd.Etcd): void {
