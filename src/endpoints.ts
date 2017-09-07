@@ -23,20 +23,32 @@ class TlsInfo {
 }
 
 export class EndpointInfo {
-    private serviceName: String;
-    private nodeInfos: NodeInfo[];
-    private tls: TlsInfo;
+    private _serviceName: String;
+    private _nodeInfos: NodeInfo[];
+    private _tls: TlsInfo;
 
     private constructor(serviceName: String, nodeInfos: NodeInfo[], tls: TlsInfo) {
-        this.serviceName = serviceName;
-        this.nodeInfos = nodeInfos;
-        this.tls = tls;
+        this._serviceName = serviceName;
+        this._nodeInfos = nodeInfos;
+        this._tls = tls;
+    }
+
+    get serviceName(): String {
+        return this._serviceName;
+    }
+
+    get nodeInfos(): NodeInfo[] {
+        return this._nodeInfos;
+    }
+
+    get tls(): TlsInfo {
+        return this._tls;
     }
 
     static create(val: etcd.EtcValueNode): EndpointInfo {
         const serviceName = val.key.slice(val.key.lastIndexOf('/') + 1);
 
-        const nds = val.nodes.find((node) => node.key.endsWith('nds'));
+        const nds = val.nodes.find((node) => node.key.endsWith('nodes'));
         let nodeInfos: NodeInfo[] = [];
         if (nds) {
             nodeInfos = nds.nodes
