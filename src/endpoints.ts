@@ -59,12 +59,29 @@ export class EndpointInfo {
         const tls = val.nodes.find((node) => node.key.endsWith('tls'));
         let tlsInfo: TlsInfo;
         if (tls) {
-            const tlsChain = tls.nodes.find((node) => node.key.endsWith('chain')).value.toString()
-            const tlsCert = tls.nodes.find((node) => node.key.endsWith('cert')).value.toString()
-            const tlsKey = tls.nodes.find((node) => node.key.endsWith('key')).value.toString()
+            const tlsChain = tls.nodes.find((node) => node.key.endsWith('chain')).value.toString();
+            const tlsCert = tls.nodes.find((node) => node.key.endsWith('cert')).value.toString();
+            const tlsKey = tls.nodes.find((node) => node.key.endsWith('key')).value.toString();
             tlsInfo = new TlsInfo(tlsChain, tlsCert, tlsKey)
         }
 
         return new EndpointInfo(serviceName, nodeInfos, tlsInfo);
+    }
+}
+
+export class EndpointsInfoWrapper {
+    private _endpoints: EndpointInfo[];
+
+    constructor(endpoints : EndpointInfo[]) {
+        this._endpoints = endpoints;
+    }
+
+
+    get endpoints(): EndpointInfo[] {
+        return this._endpoints;
+    }
+
+    set endpoints(value: EndpointInfo[]) {
+        this._endpoints = value;
     }
 }
