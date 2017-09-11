@@ -6,12 +6,6 @@ import * as Rx from 'rxjs';
 import { EndpointInfo, EndpointsInfoWrapper } from "./endpoints";
 import { EtcValueNode, WaitMaster } from "promise-etcd";
 
-const logger = new (winston.Logger)({
-    transports: [
-        new (winston.transports.Console)(),
-    ]
-});
-
 function getForwardHost() {
     return "";
 }
@@ -20,7 +14,8 @@ function getForwardPort() {
     return "";
 }
 
-function requestHandler(endpointsWrapper: EndpointsInfoWrapper) {
+function requestHandler(endpointsWrapper: EndpointsInfoWrapper,
+                        logger: winston.LoggerInstance) {
     function _requestHandler(request: http.IncomingMessage,
                              response: http.ServerResponse): void {
         logger.debug(request.url);
@@ -64,9 +59,9 @@ function detectPort() {
     return process.env.PORT || 80;
 }
 
-export function startServer(etc: etcd.Etcd): void {
+export function startServer(etc: etcd.Etcd, logger: winston.LoggerInstance): void {
     const endpointsInfoWrapper = new EndpointsInfoWrapper([]);
-    const server = http.createServer(requestHandler(endpointsInfoWrapper));
+    const server = http.createServer(requestHandler(endpointsInfoWrapper, logger));
     const port = detectPort();
     server.listen(port, (err: any) => {
         if (err) {
@@ -75,11 +70,9 @@ export function startServer(etc: etcd.Etcd): void {
 
         Rx.Observable.create((observer: Rx.Observer<EtcValueNode[]>) => {
             WaitMaster.create('', etc, 1000, 10000,
-                () => {
-                    logger.info("WaitMaster started");
-                }, () => {
-                    logger.error("WaitMaster stopped");
-                }).then((list) => {
+                () => { logger.info("WaitMaster started"); },
+                () => { logger.error("WaitMaster stopped"); }
+                ).then((list) => {
                 observer.next(list.value as EtcValueNode[]);
             });
         }).subscribe((list: EtcValueNode[]) => {

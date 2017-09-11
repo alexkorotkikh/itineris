@@ -2,19 +2,20 @@ import * as fs from 'fs';
 
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
+import * as winston from "winston";
 import * as yargs from 'yargs';
 
 import * as server from './server';
 
 const etcdOptions = {
     'etcd-cluster-id': {
-        default: 'ClusterWorld'
+        'default': 'ClusterWorld'
     },
     'etcd-app-id': {
-        default: 'HelloWorld'
+        'default': 'HelloWorld'
     },
     'etcd-url': {
-        default: 'http://localhost:2379'
+        'default': 'http://localhost:2379'
     }
 };
 
@@ -28,7 +29,7 @@ function createEtcd(argv: any): etcd.Etcd {
 }
 
 function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
-    y.command('version', 'Show router\'s version', {}, (argv: any) => {
+    y.command('version', 'Show router\'s version', {}, () => {
         observer.next(process.env.npm_package_version);
         observer.complete();
     });
@@ -37,8 +38,13 @@ function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): voi
 function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
     y.command('start', 'Starts router', etcdOptions, (argv: any) => {
         const etc = createEtcd(argv);
+        const logger = new (winston.Logger)({
+            transports: [
+                new (winston.transports.Console)(),
+            ]
+        });
         etc.connect().then(() => {
-            server.startServer(etc);
+            server.startServer(etc, logger);
             observer.next('Router started');
             observer.complete();
         }).catch((error) => {
@@ -107,7 +113,7 @@ function createDeleteEndpointHandler(y: yargs.Argv, observer: Rx.Observer<string
         'service-name': { description: 'Name of the service' },
     }, (argv) => {
         const etc = createEtcd(argv);
-        etc.rmdir(argv.serviceName, { recursive: true }).then((resp) => {
+        etc.rmdir(argv.serviceName, { recursive: true }).then(() => {
             observer.next('Node was removed');
             observer.complete();
         });
