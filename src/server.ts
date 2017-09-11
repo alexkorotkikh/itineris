@@ -4,7 +4,6 @@ import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 
 import { EndpointInfo, EndpointsInfoWrapper } from "./endpoints";
-import { EtcValueNode, WaitMaster } from "promise-etcd";
 
 function getForwardHost() {
     return "";
@@ -68,14 +67,14 @@ export function startServer(etc: etcd.Etcd, logger: winston.LoggerInstance): voi
             return logger.error('Something bad happened', err);
         }
 
-        Rx.Observable.create((observer: Rx.Observer<EtcValueNode[]>) => {
-            WaitMaster.create('', etc, 1000, 10000,
+        Rx.Observable.create((observer: Rx.Observer<etcd.EtcValueNode[]>) => {
+            etcd.WaitMaster.create('', etc, 1000, 10000,
                 () => { logger.info("WaitMaster started"); },
                 () => { logger.error("WaitMaster stopped"); }
                 ).then((list) => {
-                observer.next(list.value as EtcValueNode[]);
+                observer.next(list.value as etcd.EtcValueNode[]);
             });
-        }).subscribe((list: EtcValueNode[]) => {
+        }).subscribe((list: etcd.EtcValueNode[]) => {
             endpointsInfoWrapper.endpoints = list.map((service) => EndpointInfo.create(service));
             logger.info('Endpoints were updated');
         });

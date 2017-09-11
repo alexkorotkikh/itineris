@@ -122,7 +122,7 @@ function createDeleteEndpointHandler(y: yargs.Argv, observer: Rx.Observer<string
 
 export function cli(args: string[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
-        let y = yargs.usage('$0 <cmd> [args]');
+        const y = yargs.usage('$0 <cmd> [args]');
 
         createVersionHandler(y, observer);
         createStartHandler(y, observer);
