@@ -1,5 +1,5 @@
 import { EtcValueNode } from "promise-etcd";
-import { EndpointInfo } from "../src/endpoints";
+import { createEndpointInfo, EndpointInfo } from "../src/endpoints";
 import { assert } from 'chai';
 
 const etcValueNode = EtcValueNode.fromJson({
@@ -54,7 +54,7 @@ const etcValueNode = EtcValueNode.fromJson({
 
 describe("EndpointInfo", function () {
     it("should be parsed from EtcValueNode", function (done) {
-        const endpointInfo = EndpointInfo.create(etcValueNode);
+        const endpointInfo = createEndpointInfo(etcValueNode);
 
         assert.equal(endpointInfo.serviceName, "test-service");
         assert.equal(endpointInfo.nodeInfos.length, 1);

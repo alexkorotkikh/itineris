@@ -1,87 +1,83 @@
 import * as etcd from "promise-etcd";
+import { EtcValueNode } from "promise-etcd";
+import * as Rx from 'rxjs';
+import * as winston from "winston";
 
-class NodeInfo {
+interface NodeInfo {
     ip: string;
     port: string;
-
-    constructor(ip: string, port: string) {
-        this.ip = ip;
-        this.port = port;
-    }
 }
 
-class TlsInfo {
+interface TlsInfo {
     tlsChain: string;
     tlsCert: string;
     tlsKey: string;
+}
 
-    constructor(tlsChain: string, tlsCert: string, tlsKey: string) {
-        this.tlsChain = tlsChain;
-        this.tlsCert = tlsCert;
-        this.tlsKey = tlsKey;
+export interface EndpointInfo {
+    serviceName: String;
+    nodeInfos: NodeInfo[];
+    tls: TlsInfo;
+}
+
+export function createEndpointInfo(val: etcd.EtcValueNode): EndpointInfo {
+    const name = val.key.slice(val.key.lastIndexOf('/') + 1);
+
+    const nds = val.nodes.find((node) => node.key.endsWith('nodes'));
+    const nodeInfos: NodeInfo[] = nds &&
+        nds.nodes
+            .map(node => JSON.parse(node.value))
+            .map(json => {
+                return { ip: json.ip, port: json.port };
+            });
+
+
+    const tls = val.nodes.find((node) => node.key.endsWith('tls'));
+    const tlsInfo: TlsInfo = tls && {
+        tlsChain: tls.nodes.find((node) => node.key.endsWith('chain')).value.toString(),
+        tlsCert: tls.nodes.find((node) => node.key.endsWith('cert')).value.toString(),
+        tlsKey: tls.nodes.find((node) => node.key.endsWith('key')).value.toString(),
+    };
+
+    return {
+        serviceName: name,
+        nodeInfos: nodeInfos,
+        tls: tlsInfo,
+    };
+}
+
+export class EndpointInfoSource {
+    private etc: etcd.Etcd;
+    private logger: winston.LoggerInstance;
+
+    constructor(etc: etcd.Etcd, logger: winston.LoggerInstance) {
+        this.etc = etc;
+        this.logger = logger;
+    }
+
+    start(): Rx.Observable<EtcValueNode[]> {
+        return Rx.Observable.create((observer: Rx.Observer<etcd.EtcValueNode[]>) => {
+            etcd.WaitMaster.create('', this.etc, 1000, 10000,
+                () => {
+                    this.logger.info("WaitMaster started");
+                },
+                () => {
+                    this.logger.error("WaitMaster stopped");
+                }
+            ).then((list) => {
+                observer.next(list.value as etcd.EtcValueNode[]);
+            });
+        })
     }
 }
 
-export class EndpointInfo {
-    private _serviceName: String;
-    private _nodeInfos: NodeInfo[];
-    private _tls: TlsInfo;
+export class EndpointInfoStorage {
 
-    private constructor(serviceName: String, nodeInfos: NodeInfo[], tls: TlsInfo) {
-        this._serviceName = serviceName;
-        this._nodeInfos = nodeInfos;
-        this._tls = tls;
-    }
+    update(val: EtcValueNode[]): Rx.Observable<EndpointInfo[]> {
+        return Rx.Observable.create((observer: Rx.Observer<EndpointInfo[]>) => {
+            const infos = val.map(createEndpointInfo);
+            observer.next(infos);
+        });
 
-    get serviceName(): String {
-        return this._serviceName;
-    }
-
-    get nodeInfos(): NodeInfo[] {
-        return this._nodeInfos;
-    }
-
-    get tls(): TlsInfo {
-        return this._tls;
-    }
-
-    static create(val: etcd.EtcValueNode): EndpointInfo {
-        const serviceName = val.key.slice(val.key.lastIndexOf('/') + 1);
-
-        const nds = val.nodes.find((node) => node.key.endsWith('nodes'));
-        let nodeInfos: NodeInfo[] = [];
-        if (nds) {
-            nodeInfos = nds.nodes
-                .map((node) => JSON.parse(node.value))
-                .map((json) => new NodeInfo(json.ip, json.port));
-        }
-
-        const tls = val.nodes.find((node) => node.key.endsWith('tls'));
-        let tlsInfo: TlsInfo;
-        if (tls) {
-            const tlsChain = tls.nodes.find((node) => node.key.endsWith('chain')).value.toString();
-            const tlsCert = tls.nodes.find((node) => node.key.endsWith('cert')).value.toString();
-            const tlsKey = tls.nodes.find((node) => node.key.endsWith('key')).value.toString();
-            tlsInfo = new TlsInfo(tlsChain, tlsCert, tlsKey)
-        }
-
-        return new EndpointInfo(serviceName, nodeInfos, tlsInfo);
-    }
-}
-
-export class EndpointsInfoWrapper {
-    private _endpoints: EndpointInfo[];
-
-    constructor(endpoints : EndpointInfo[]) {
-        this._endpoints = endpoints;
-    }
-
-
-    get endpoints(): EndpointInfo[] {
-        return this._endpoints;
-    }
-
-    set endpoints(value: EndpointInfo[]) {
-        this._endpoints = value;
     }
 }
