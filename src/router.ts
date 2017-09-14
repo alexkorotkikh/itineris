@@ -42,9 +42,12 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
         const logger = new (winston.Logger)({
             transports: [new (winston.transports.Console)()]
         });
-        const storage = new EndpointInfoStorage();
+
+        const infoSource = new EndpointInfoSource(etc, logger);
+        const storage = new EndpointInfoStorage(logger);
         const serverManager = new server.ServerManager();
-        new EndpointInfoSource(etc, logger).start()
+
+        infoSource.start()
             .flatMap(nodes => storage.update(nodes))
             .flatMap(changedEndpoints => serverManager.updateEndpoints(changedEndpoints))
             .subscribe(result => logger.info("configuration updated", result));
@@ -84,8 +87,6 @@ function createAddEndpointHandler(y: yargs.Argv, observer: Rx.Observer<string>):
         observer.next('Endpoint was added');
         observer.complete();
     });
-    // observer.error(error);
-    // observer.complete();
 }
 
 function createListEndpointsHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {

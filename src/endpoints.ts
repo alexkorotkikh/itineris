@@ -58,26 +58,30 @@ export class EndpointInfoSource {
     start(): Rx.Observable<EtcValueNode[]> {
         return Rx.Observable.create((observer: Rx.Observer<etcd.EtcValueNode[]>) => {
             etcd.WaitMaster.create('', this.etc, 1000, 10000,
-                () => {
-                    this.logger.info("WaitMaster started");
-                },
-                () => {
-                    this.logger.error("WaitMaster stopped");
-                }
-            ).then((list) => {
-                observer.next(list.value as etcd.EtcValueNode[]);
-            });
+                () => this.logger.info("WaitMaster started"),
+                () => this.logger.error("WaitMaster stopped"),
+            ).then(list => observer.next(list.value as etcd.EtcValueNode[]));
         })
     }
 }
 
 export class EndpointInfoStorage {
+    private logger: winston.LoggerInstance;
+    private nodesInfo: EndpointInfo[];
+
+    constructor(logger: winston.LoggerInstance) {
+        this.logger = logger;
+        this.nodesInfo = [];
+    }
 
     update(val: EtcValueNode[]): Rx.Observable<EndpointInfo[]> {
         return Rx.Observable.create((observer: Rx.Observer<EndpointInfo[]>) => {
-            const infos = val.map(createEndpointInfo);
-            observer.next(infos);
+            const changed = val && val.map(createEndpointInfo);
+            changed.forEach(info => {
+                this.nodesInfo = this.nodesInfo.filter(i => i.serviceName !== info.serviceName);
+                this.nodesInfo.push(info);
+            });
+            observer.next(changed);
         });
-
     }
 }
