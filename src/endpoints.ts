@@ -1,5 +1,5 @@
 import * as etcd from "promise-etcd";
-import { EtcValueNode } from "promise-etcd";
+import { EtcValueNode, WaitMaster } from "promise-etcd";
 import * as Rx from 'rxjs';
 import * as winston from "winston";
 
@@ -21,9 +21,9 @@ export interface EndpointInfo {
 }
 
 export function createEndpointInfo(val: etcd.EtcValueNode): EndpointInfo {
-    const name = val.key.slice(val.key.lastIndexOf('/') + 1);
+    const name = val && val.key && val.key.slice(val.key.lastIndexOf('/') + 1);
 
-    const nds = val.nodes.find((node) => node.key.endsWith('nodes'));
+    const nds = val.nodes && val.nodes.find((node) => node.key.endsWith('nodes'));
     const nodeInfos: NodeInfo[] = nds &&
         nds.nodes
             .map(node => JSON.parse(node.value))
@@ -32,7 +32,7 @@ export function createEndpointInfo(val: etcd.EtcValueNode): EndpointInfo {
             });
 
 
-    const tls = val.nodes.find((node) => node.key.endsWith('tls'));
+    const tls = val.nodes && val.nodes.find((node) => node.key.endsWith('tls'));
     const tlsInfo: TlsInfo = tls && {
         tlsChain: tls.nodes.find((node) => node.key.endsWith('chain')).value.toString(),
         tlsCert: tls.nodes.find((node) => node.key.endsWith('cert')).value.toString(),
@@ -55,12 +55,17 @@ export class EndpointInfoSource {
         this.logger = logger;
     }
 
-    start(): Rx.Observable<EtcValueNode[]> {
-        return Rx.Observable.create((observer: Rx.Observer<etcd.EtcValueNode[]>) => {
-            etcd.WaitMaster.create('', this.etc, 1000, 10000,
+    start(): Rx.Observable<EtcValueNode> {
+        return Rx.Observable.create((observer: Rx.Observer<etcd.EtcValueNode>) => {
+            etcd.WaitMaster.create('test-key', this.etc, 1000, 10000,
                 () => this.logger.info("WaitMaster started"),
                 () => this.logger.error("WaitMaster stopped"),
-            ).then(list => observer.next(list.value as etcd.EtcValueNode[]));
+            ).then((master: WaitMaster) => {
+                Rx.Observable.fromPromise(master.currentWait).subscribe(update => {
+                    this.logger.info(update);
+                    observer.next(update)
+                });
+            });
         })
     }
 }
@@ -74,13 +79,14 @@ export class EndpointInfoStorage {
         this.nodesInfo = [];
     }
 
-    update(val: EtcValueNode[]): Rx.Observable<EndpointInfo[]> {
-        return Rx.Observable.create((observer: Rx.Observer<EndpointInfo[]>) => {
-            const changed = val && val.map(createEndpointInfo);
-            changed.forEach(info => {
-                this.nodesInfo = this.nodesInfo.filter(i => i.serviceName !== info.serviceName);
-                this.nodesInfo.push(info);
-            });
+    update(val: any): Rx.Observable<EndpointInfo> {
+        return Rx.Observable.create((observer: Rx.Observer<EndpointInfo>) => {
+            this.logger.info(JSON.stringify(val));
+            const changed = val && createEndpointInfo(val.node);
+
+            this.nodesInfo = this.nodesInfo.filter(i => i.serviceName !== changed.serviceName);
+            this.nodesInfo.push(changed);
+
             observer.next(changed);
         });
     }

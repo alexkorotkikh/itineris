@@ -1,17 +1,19 @@
 import * as Rx from 'rxjs';
 
 import { EndpointInfo } from "./endpoints";
+import * as winston from "winston";
 
 
 export class ServerManager {
-    private endpoints: EndpointInfo[];
+    private logger: winston.LoggerInstance;
 
-    updateEndpoints(changedEndpoints: EndpointInfo[]): Rx.Observable<string> {
+    constructor(logger: winston.LoggerInstance) {
+        this.logger = logger;
+    }
+
+    updateEndpoints(changedEndpoint: EndpointInfo): Rx.Observable<string> {
         return Rx.Observable.create((observer: Rx.Observer<string>) => {
-            changedEndpoints.forEach(changed => {
-                this.endpoints = this.endpoints.filter(e => e.serviceName !== changed.serviceName);
-                this.endpoints.push(changed);
-            });
+            this.logger.info(changedEndpoint.toString());
             observer.next("OK");
         });
     }

@@ -45,7 +45,7 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
 
         const infoSource = new EndpointInfoSource(etc, logger);
         const storage = new EndpointInfoStorage(logger);
-        const serverManager = new server.ServerManager();
+        const serverManager = new server.ServerManager(logger);
 
         infoSource.start()
             .flatMap(nodes => storage.update(nodes))
@@ -53,7 +53,6 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
             .subscribe(result => logger.info("configuration updated", result));
 
         observer.next("Router started");
-        observer.complete();
     });
 }
 
