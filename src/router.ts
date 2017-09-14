@@ -73,15 +73,16 @@ function createAddEndpointHandler(y: yargs.Argv, observer: Rx.Observer<string>):
 
         const etc = createEtcd(argv);
         await etc.connect();
-        await etc.mkdir(`${argv.serviceName}`);
-
-        await etc.mkdir(`${argv.serviceName}/nodes`);
-        await etc.setJson(`${argv.serviceName}/nodes/${argv.nodeName}`, { ip: argv.ip, port: argv.port });
-
-        await etc.mkdir(`${argv.serviceName}/tls`);
-        await etc.setRaw(`${argv.serviceName}/tls/cert`, tlsCert);
-        await etc.setRaw(`${argv.serviceName}/tls/chain`, tlsChain);
-        await etc.setRaw(`${argv.serviceName}/tls/key`, tlsKey);
+        await etc.setJson(argv.serviceName, {
+            'nodes': {
+                [argv.serviceName]: { 'ip': argv.ip, 'port': argv.port }
+            },
+            'tls': {
+                'cert': tlsCert,
+                'chain': tlsChain,
+                'key': tlsKey,
+            },
+        });
 
         observer.next('Endpoint was added');
         observer.complete();

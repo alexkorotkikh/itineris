@@ -13,7 +13,7 @@ export class ServerManager {
 
     updateEndpoints(changedEndpoint: EndpointInfo): Rx.Observable<string> {
         return Rx.Observable.create((observer: Rx.Observer<string>) => {
-            this.logger.info(changedEndpoint.toString());
+            this.logger.info(JSON.stringify(changedEndpoint));
             observer.next("OK");
         });
     }
