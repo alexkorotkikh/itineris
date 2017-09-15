@@ -24,9 +24,6 @@ describe('router', function () {
         router.cli(['start']).subscribe((start) => {
             assert.equal(start, 'Router started');
             done();
-        }, (error) => {
-            assert.fail();
-            done();
         });
     });
 
@@ -49,13 +46,12 @@ describe('router', function () {
             router.cli(['list-endpoints']).subscribe((list) => {
                 const json = JSON.parse(list);
 
-                const node = json[0]['nodes'][0]['nodes'][0];
-                assert.equal(node['key'], '/HelloWorld/ClusterWorld/test-service/nodes/test-node');
-                assert.equal(node['value'], '{"ip":"127.0.0.1","port":8080}');
+                const node = json.find((child: any) => child['key'] === '/HelloWorld/ClusterWorld/test-service');
+                assert.isDefined(node);
 
-                const tls = json[0]['nodes'][1];
-                assert.equal(tls['key'], '/HelloWorld/ClusterWorld/test-service/tls');
-                assert.equal(tls['nodes'].length, 3);
+                const value = node['value'];
+                assert.isDefined(value);
+                assert.equal(value, '{"nodes":{"test-service":{"ip":"127.0.0.1","port":8080}},"tls":{"cert":"test3","chain":"test3","key":"test3"}}');
 
                 done();
             });
