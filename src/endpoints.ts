@@ -1,7 +1,7 @@
-import * as etcd from "promise-etcd";
-import { EtcResponse, EtcValueNode, WaitMaster } from "promise-etcd";
 import * as Rx from 'rxjs';
 import * as winston from "winston";
+import EtcValueNode from "promise-etcd/dist/lib/etc-value-node";
+import EtcdPromise from "promise-etcd/dist/lib/etcd-promise";
 
 interface NodeInfo {
     nodeName: string;
@@ -21,7 +21,7 @@ export interface EndpointInfo {
     tls: TlsInfo;
 }
 
-export function createEndpointInfo(etcValueNode: etcd.EtcValueNode): EndpointInfo {
+export function createEndpointInfo(etcValueNode: EtcValueNode): EndpointInfo {
     const name = etcValueNode.key.slice(etcValueNode.key.lastIndexOf('/') + 1);
     const value = JSON.parse(etcValueNode.value);
 
@@ -48,25 +48,21 @@ export function createEndpointInfo(etcValueNode: etcd.EtcValueNode): EndpointInf
 }
 
 export class EndpointInfoSource {
-    private etc: etcd.Etcd;
+    private etc: EtcdPromise;
     private logger: winston.LoggerInstance;
 
-    constructor(etc: etcd.Etcd, logger: winston.LoggerInstance) {
+    constructor(etc: EtcdPromise, logger: winston.LoggerInstance) {
         this.etc = etc;
         this.logger = logger;
     }
 
     start(): Rx.Observable<EtcValueNode> {
-        return Rx.Observable.fromPromise(
-            etcd.WaitMaster.create('test-key', this.etc, 1000, 10000,
-                () => this.logger.info("WaitMaster started"),
-                () => this.logger.error("WaitMaster stopped"),
-            ).then((master: WaitMaster) => master.currentWait)
-                .then((res: EtcResponse) => res.node)
-                .catch(reason => {
-                    throw Error(reason)
+        return Rx.Observable.create((observer: Rx.Observer<EtcValueNode>) => {
+            this.etc.createChangeWaiter('', { recursive: true })
+                .subscribe((res) => {
+                    observer.next(res.node);
                 })
-        );
+        });
     }
 }
 

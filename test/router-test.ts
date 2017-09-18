@@ -73,7 +73,7 @@ describe('router', function () {
                 'delete-endpoint',
                 '--service-name', 'service-to-delete',
             ]).subscribe(() => {
-                router.cli(['list-endpoints']).subscribe((list) => {
+                router.cli(['list-endpoints']).subscribe(list => {
                     const nodes = JSON.parse(list);
                     assert.isTrue(
                         nodes.every((node: any) => node['key'] !== '/HelloWorld/ClusterWorld/service-to-delete')

@@ -1,6 +1,6 @@
-import { EtcValueNode } from "promise-etcd";
 import { createEndpointInfo, EndpointInfo } from "../src/endpoints";
 import { assert } from 'chai';
+import EtcValueNode from "promise-etcd/dist/lib/etc-value-node";
 
 const etcValueNode = EtcValueNode.fromJson({
     "dir": false,

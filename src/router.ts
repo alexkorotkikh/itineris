@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as winston from "winston";
@@ -20,13 +18,13 @@ const etcdOptions = {
     }
 };
 
-function createEtcd(argv: any): etcd.Etcd {
+function createEtcd(argv: any): etcd.EtcdPromise {
     const cfg = etcd.Config.start([
         '--etcd-cluster-id', argv.etcdClusterId,
         '--etcd-app-id', argv.etcdAppId,
         '--etcd-url', argv.etcdUrl,
     ]);
-    return etcd.Etcd.create(cfg);
+    return etcd.EtcdPromise.create(cfg);
 }
 
 function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
@@ -66,34 +64,36 @@ function createAddEndpointHandler(y: yargs.Argv, observer: Rx.Observer<string>):
         'tls-cert': { description: 'Path to TLS certificate file' },
         'tls-chain': { description: 'Path to TLS chain file' },
         'tls-key': { description: 'Path to TLS key file' }
-    }, async (argv) => {
-        const tlsCert = fs.readFileSync(argv.tlsCert, 'utf8');
-        const tlsChain = fs.readFileSync(argv.tlsChain, 'utf8');
-        const tlsKey = fs.readFileSync(argv.tlsKey, 'utf8');
+    }, (argv) => {
+        // const tlsCert = fs.readFileSync(argv.tlsCert, 'utf8');
+        // const tlsChain = fs.readFileSync(argv.tlsChain, 'utf8');
+        // const tlsKey = fs.readFileSync(argv.tlsKey, 'utf8');
+        //
+        // const etc = createEtcd(argv);
+        // etc.connect().then(() => {
+            // etc.setJson(argv.serviceName, {
+            //     'nodes': {
+            //         [argv.serviceName]: { 'ip': argv.ip, 'port': argv.port }
+            //     },
+            //     'tls': {
+            //         'cert': tlsCert,
+            //         'chain': tlsChain,
+            //         'key': tlsKey,
+            //     },
+            // }).then(() => {
+                observer.next('Endpoint was added');
+                observer.complete();
+            // });
+        // });
 
-        const etc = createEtcd(argv);
-        await etc.connect();
-        await etc.setJson(argv.serviceName, {
-            'nodes': {
-                [argv.serviceName]: { 'ip': argv.ip, 'port': argv.port }
-            },
-            'tls': {
-                'cert': tlsCert,
-                'chain': tlsChain,
-                'key': tlsKey,
-            },
-        });
-
-        observer.next('Endpoint was added');
-        observer.complete();
     });
 }
 
 function createListEndpointsHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
     y.command('list-endpoints', 'Show the list of endpoints', etcdOptions, (argv) => {
         const etc = createEtcd(argv);
-        etc.list('', { recursive: true }).then((val) => {
-            observer.next(JSON.stringify(val.value));
+        etc.list('', { recursive: true }).then((res) => {
+            observer.next(JSON.stringify(res.value));
             observer.complete();
         });
     });
@@ -105,7 +105,7 @@ function createDeleteEndpointHandler(y: yargs.Argv, observer: Rx.Observer<string
         'service-name': { description: 'Name of the service' },
     }, (argv) => {
         const etc = createEtcd(argv);
-        etc.rmdir(argv.serviceName, { recursive: true }).then(() => {
+        etc.rmdir(argv.serviceName, { recursive: true }).then((res) => {
             observer.next('Node was removed');
             observer.complete();
         });
