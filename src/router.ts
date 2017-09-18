@@ -1,10 +1,10 @@
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
-import * as winston from "winston";
+import * as winston from 'winston';
 import * as yargs from 'yargs';
 
 import * as server from './server';
-import { EndpointInfoSource, EndpointInfoStorage } from "./endpoints";
+import { EndpointInfoSource, EndpointInfoStorage } from './endpoints';
 
 const etcdOptions = {
     'etcd-cluster-id': {
@@ -48,9 +48,9 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
         infoSource.start()
             .flatMap(nodes => storage.update(nodes))
             .flatMap(changedEndpoints => serverManager.updateEndpoints(changedEndpoints))
-            .subscribe(result => logger.info("configuration updated", result));
+            .subscribe(result => logger.info('configuration updated', result));
 
-        observer.next("Router started");
+        observer.next('Router started');
     });
 }
 
@@ -93,8 +93,13 @@ function createListEndpointsHandler(y: yargs.Argv, observer: Rx.Observer<string>
     y.command('list-endpoints', 'Show the list of endpoints', etcdOptions, (argv) => {
         const etc = createEtcd(argv);
         etc.list('', { recursive: true }).then((res) => {
-            observer.next(JSON.stringify(res.value));
-            observer.complete();
+            if (res.isErr()) {
+                observer.error(res);
+            } else {
+                console.log('res', res);
+                observer.next(JSON.stringify(res.value));
+                observer.complete();
+            }
         });
     });
 }
@@ -114,7 +119,8 @@ function createDeleteEndpointHandler(y: yargs.Argv, observer: Rx.Observer<string
 
 export function cli(args: string[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
-        const y = yargs.usage('$0 <cmd> [args]');
+        const hack = yargs as any;
+        const y = (new hack()).usage('$0 <cmd> [args]');
 
         createVersionHandler(y, observer);
         createStartHandler(y, observer);
