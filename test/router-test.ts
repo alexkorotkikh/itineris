@@ -16,7 +16,7 @@ describe('router', function (): void {
 
   const log: winston.LoggerInstance = new (winston.Logger)({
     transports: [new (winston.transports.Console)()]
-  })
+  });
 
   before(async () => {
     let wc = etcd.Config.start([
@@ -45,7 +45,7 @@ describe('router', function (): void {
     });
   });
 
-  it.only('adds endpoint to etcd', (done) => {
+  it('adds endpoint to etcd', (done) => {
     let uuid = Uuid.v4().toString();
     router.cli([
       'add-endpoint',
@@ -119,7 +119,9 @@ describe('router', function (): void {
     });
   });
 
-  it('reacts on adding and removing endpoints', function (done) {
+  it.only('reacts on adding and removing endpoints', function (done) {
+    this.timeout(5000);
+
     function startRouter(): Rx.Observable<string> {
       return router.cli(['start']);
     }
@@ -149,14 +151,22 @@ describe('router', function (): void {
 
     function checkIsAccessible(endPoint: EndPoint): Rx.Observable<void> {
       return Rx.Observable.create((observer: Rx.Observer<void>) => {
-        const ipPort = endPoint.listNodes()[0].listBinds()[0];
-        rq.get({
-          uri: `http://${ipPort.ip.to_string()}:${ipPort.port}/`,
-          resolveWithFullResponse: true,
-          }, (error, response, body) => {
-          assert.isBelow(response.statusCode, 500);
-          observer.next(null);
-        });
+        function ping(attempts: number) {
+          const ipPort = endPoint.listNodes()[0].listBinds()[0];
+          rq.get({
+            uri: `http://${ipPort.ip.to_string()}:${ipPort.port}/`,
+            resolveWithFullResponse: true,
+          }).then(response => {
+            assert.isBelow(response.statusCode, 500);
+            console.log('2');
+            observer.next(null);
+          }).catch(err => {
+            if (attempts > 0) ping(attempts - 1);
+            else assert.fail(err);
+          });
+        }
+
+        ping(10);
       });
     }
 
@@ -181,7 +191,7 @@ describe('router', function (): void {
             rq.get({
               uri: `http://${ipPort.ip.to_string()}:${ipPort.port}/`,
               resolveWithFullResponse: true,
-            }, (error, response, body) => {
+            }).then(response => {
               assert.isAtMost(response.statusCode, 500);
               done();
             });

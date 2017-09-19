@@ -38,7 +38,7 @@ export class Node {
     public readonly name: string;
     private binds: IpPort[];
 
-    public static cli(y: yargs.Argv, opNodeName: any): yargs.Argv {
+    public static cli(y: yargs.Argv, opNodeName: any, obs: rx.Observer<string>): yargs.Argv {
         return y.command('node', 'handle node', (__argv): yargs.Argv => {
             const opIpPort = Object.assign({
                 'ip': {
@@ -52,7 +52,7 @@ export class Node {
             }, opNodeName);
             const node = yargs.usage('$0 service node <cmd> [args]');
             node.command('add', 'add ipport by name', opIpPort, (argv) => {
-                /* */
+              obs.next("node added")
             });
             node.command('list', 'list ipport by name', opNodeName, (argv) => {
                 /* */
@@ -145,7 +145,7 @@ export class EndPoint {
             }, opEndpointName);
             const x = yargs.usage('$0 endpoint <cmd> [args]')
                 .command('add', 'adds a endpoint', opEndpointName, (argv) => {
-                    /* */
+                    obs.next("endpoint added")
                 })
                 .command('list', 'list endpoint', {},
                 (argv) => {
@@ -186,7 +186,7 @@ export class EndPoint {
                     });
                     return nodes;
                 });
-            Node.cli(x, opNodeName);
+            Node.cli(x, opNodeName, obs);
             return x;
         });
     }
@@ -201,6 +201,7 @@ export class EndPoint {
     constructor(name: string, log: winston.LoggerInstance) {
         this.name = name;
         this.log = log;
+        this.nodes = [];
     }
 
     public addNode(name: string): Node {
