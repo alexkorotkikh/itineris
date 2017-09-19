@@ -5,7 +5,7 @@ import * as yargs from 'yargs';
 import * as fs from 'fs';
 
 import * as server from './server';
-import { EndpointInfoSource, EndpointInfoStorage } from './endpoints';
+import { EndPoint } from './endpoint';
 
 function createEtcd(argv: any): etcd.EtcdPromise {
     const cfg = etcd.Config.start([
@@ -30,15 +30,14 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
             transports: [new (winston.transports.Console)()]
         });
 
-        const infoSource = new EndpointInfoSource(etc, logger);
-        const storage = new EndpointInfoStorage(logger);
-        const serverManager = new server.ServerManager(logger);
+        //const infoSource = new EndpointInfoSource(etc, logger);
+        //const storage = new EndpointInfoStorage(logger);
+        //const serverManager = new server.ServerManager(logger);
 
-        infoSource.start()
-            .flatMap(nodes => storage.update(nodes))
-            .flatMap(changedEndpoints => serverManager.updateEndpoints(changedEndpoints))
-            .subscribe(result => logger.info('configuration updated', result));
-
+        //infoSource.start()
+        //    .flatMap(nodes => storage.update(nodes))
+        //    .flatMap(changedEndpoints => serverManager.updateEndpoints(changedEndpoints))
+        //    .subscribe(result => logger.info('configuration updated', result));
         observer.next('Router started');
     });
 }
@@ -50,86 +49,6 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
 //    set    tls-options
 //    remove tls-options
 
-function createServiceHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
-    y.command('service', 'service commands', (_argv): yargs.Argv => {
-        const service = yargs.usage('$0 service <cmd> [args]');
-        service.command('add', 'adds a service', {
-            'name': { description: 'Name of the service' }
-        }, (argv) => {
-            /* */
-        });
-        service.command('list', 'list services', {},
-            (argv) => {
-                /* */
-            });
-        service.command('remove', 'remove a service', {
-            'name': { description: 'Name of the service' }
-        }, (argv) => {
-            /* */
-        });
-        service.command('set', 'options to a service', {
-            'tls-cert': { description: 'Path to TLS certificate file' },
-            'tls-chain': { description: 'Path to TLS chain file' },
-            'tls-key': { description: 'Path to TLS key file' }
-        }, (argv) => {
-            /* */
-        });
-        service.command('unset', 'remove options from a service', {
-            'tls-cert': {
-                description: 'Path to TLS certificate file',
-                default: false
-            },
-            'tls-chain': {
-                description: 'Path to TLS chain file',
-                default: false
-            },
-            'tls-key': {
-                description: 'Path to TLS key file',
-                default: false
-            }
-        });
-        service.command('nodes', 'handle nodes', (__argv): yargs.Argv => {
-            const nodes = yargs.usage('$0 service nodes <cmd> [args]');
-            nodes.command('add', 'add node by name', {
-                'name': { description: 'Name of the node' },
-            }, (argv) => {
-                /* */
-            });
-            nodes.command('list', 'list node by name', {}, (argv) => {
-                /* */
-            });
-            nodes.command('remove', 'add node by name', {
-                'name': { description: 'Name of the node' },
-            }, (argv) => {
-                /* */
-            });
-            return nodes;
-        });
-
-        service.command('node', 'handle node', {
-            'name': {
-                description: 'Name of the node',
-                required: true
-            },
-        }, (__argv): yargs.Argv => {
-            const node = yargs.usage('$0 service node <cmd> [args]');
-            node.command('add', 'add node by name', {
-                'ip': { description: 'IP address of the endpoint', required: true },
-                'port': { description: 'Port of the endpoint', required: true },
-            }, (argv) => {
-                /* */
-            });
-            node.command('list', 'list node by name', {}, (argv) => {
-                /* */
-            });
-            node.command('remove', 'add node by name', {
-                'ip': { description: 'IP address of the endpoint', required: true },
-                'port': { description: 'Port of the endpoint', required: true },
-            }, (argv) => {
-                /* */
-            });
-            return node;
-        });
         //     const tlsCert = fs.readFileSync(argv.tlsCert, 'utf8');
         //     const tlsChain = fs.readFileSync(argv.tlsChain, 'utf8');
         //     const tlsKey = fs.readFileSync(argv.tlsKey, 'utf8');
@@ -160,9 +79,6 @@ function createServiceHandler(y: yargs.Argv, observer: Rx.Observer<string>): voi
         // });
 
         // });
-        return service;
-    });
-}
 
 function jsonOrText(_yargs: any): any {
     return _yargs.option('json', {
@@ -204,7 +120,7 @@ export function cli(args: string[]): Rx.Observable<string> {
 
         createVersionHandler(y, observer);
         createStartHandler(y, observer);
-        createServiceHandler(y, observer);
+        EndPoint.cli(y, observer);
 
         y.help().parse(args);
     });
