@@ -5,8 +5,8 @@ import { IPAddress } from 'ipaddress';
 
 export class IpPort {
     private readonly log: winston.LoggerInstance;
-    private readonly ip: IPAddress;
-    private readonly port: number;
+    public readonly ip: IPAddress;
+    public readonly port: number;
 
     public static loadFrom(obj: any, log: winston.LoggerInstance): IpPort {
         const ip = IPAddress.parse(obj.ip);

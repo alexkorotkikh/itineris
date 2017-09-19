@@ -3,6 +3,8 @@ import { createEndpointInfo, EndpointInfo } from "../src/endpoints";
 import { assert } from 'chai';
 import EtcValueNode from "promise-etcd/dist/lib/etc-value-node";
 
+import { createEndpointInfo, EndpointInfo } from "../src/endpoints";
+
 const etcValueNode = EtcValueNode.fromJson({
     "dir": false,
     "nodes": null,

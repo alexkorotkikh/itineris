@@ -1,8 +1,9 @@
+import * as fs from "fs";
+
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as winston from 'winston';
 import * as yargs from 'yargs';
-import * as fs from 'fs';
 
 import * as server from './server';
 import { EndPoint } from './endpoint';
@@ -58,13 +59,13 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void 
         //         const key = `endpoints/${argv.serviceName}`;
         //         etc.getJson(argv.serviceName)
         //         etc.setJson(, {
-        //             argv.serviceName: { 
+        //             argv.serviceName: {
         //                 'nodes': {
         //                     argv.nodeName: [
 
         //                     ]
         //                 }
-        //                         'ip': argv.ip, 'port': argv.port 
+        //                         'ip': argv.ip, 'port': argv.port
         //                         'tls': {
         //                     'cert': tlsCert,
         //                     'chain': tlsChain,
