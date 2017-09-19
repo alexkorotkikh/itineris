@@ -1,6 +1,7 @@
 import * as router from '../src/router';
 import { assert } from 'chai';
 import * as etcd from 'promise-etcd';
+import * as Uuid from 'uuid';
 
 const TIMEOUT = 2000;
 
@@ -35,9 +36,10 @@ describe('router', function (): void {
     });
 
     it.only('adds endpoint to etcd', (done) => {
-
+        let uuid = Uuid.v4().toString();
         router.cli([
             'add-endpoint',
+            '--etcd-cluster-id', uuid,
             '--service-name', 'test-service',
             '--node-name', 'test-node',
             '--ip', '127.0.0.1',
