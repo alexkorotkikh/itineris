@@ -175,7 +175,7 @@ describe('router', function (): void {
         addNewEndpoint(count).subscribe(endPoint => {
           checkIsAccessible(endPoint).subscribe(() => {
             if (count > 0) checkAddEndpoints(count - 1);
-            observer.next(null);
+            else observer.next(null);
           });
         });
       });

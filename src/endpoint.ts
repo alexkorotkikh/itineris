@@ -2,6 +2,7 @@ import * as rx from 'rxjs';
 import * as winston from 'winston';
 import * as yargs from 'yargs';
 import { IPAddress } from 'ipaddress';
+import * as etcd from 'promise-etcd';
 
 export class IpPort {
     private readonly log: winston.LoggerInstance;
@@ -52,7 +53,7 @@ export class Node {
             }, opNodeName);
             const node = yargs.usage('$0 service node <cmd> [args]');
             node.command('add', 'add ipport by name', opIpPort, (argv) => {
-              obs.next("node added")
+              obs.next('node added')
             });
             node.command('list', 'list ipport by name', opNodeName, (argv) => {
                 /* */
@@ -129,7 +130,7 @@ export class EndPoint {
     public nodes: Node[];
     public tls: Tls;
 
-    public static cli(y: yargs.Argv, obs: rx.Observer<string>): void {
+    public static cli(y: yargs.Argv, etc: etcd.EtcdObserable, obs: rx.Observer<string>): void {
         y.command('endpoint', 'endpoint commands', (_argv): yargs.Argv => {
             const opEndpointName = {
                     'endpointName': {
@@ -145,14 +146,31 @@ export class EndPoint {
             }, opEndpointName);
             const x = yargs.usage('$0 endpoint <cmd> [args]')
                 .command('add', 'adds a endpoint', opEndpointName, (argv) => {
-                    obs.next("endpoint added")
+                    etc.getRaw(`endpoints/${argv.endpointName}`).subscribe((resp) => {
+                        if (resp.isOk()) {
+                          obs.error('endpoint already exists');
+                        } else {
+                          etc.setJson(`endpoints/${argv.endpointName}`, {
+                            name: argv.endpointName,
+                            nodes: [],
+                            tls: {},
+                          })
+                        }
+                    });
+                    obs.next('endpoint was added')
                 })
                 .command('list', 'list endpoint', {},
                 (argv) => {
-                    /* */
+                    etc.getString('endpoints', { recursive: true }).subscribe(resp => {
+                        if (resp.isErr()) obs.error(resp.err);
+                        else obs.next(resp.value);
+                    })
                 })
                 .command('remove', 'remove a endpoint', opEndpointName, (argv) => {
-                    /* */
+                  etc.delete(`endpoints/${argv.endpointName}`).subscribe(resp => {
+                      if (resp.isErr()) obs.error(resp.err);
+                      else obs.next('endpoint was removed');
+                  });
                 })
                 .command('set', 'options to a endpoint', {
                     'tls-cert': {
@@ -192,7 +210,7 @@ export class EndPoint {
     }
 
     public static loadFrom(obj: any, log: winston.LoggerInstance): EndPoint {
-        const ret = new EndPoint(name, log);
+        const ret = new EndPoint(obj.name, log);
         (obj.nodes || []).forEach((_obj: any) => ret.addNode(_obj.name).loadFrom(_obj));
         ret.tls = Tls.loadFrom(obj.tls, log);
         return ret;

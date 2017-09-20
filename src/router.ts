@@ -121,7 +121,13 @@ export function cli(args: string[]): Rx.Observable<string> {
 
         createVersionHandler(y, observer);
         createStartHandler(y, observer);
-        EndPoint.cli(y, observer);
+
+      const cfg = etcd.Config.start([
+        '--etcd-cluster-id', y.argv.etcdClusterId,
+        '--etcd-app-id', y.argv.etcdAppId,
+        '--etcd-url', y.argv.etcdUrl,
+      ]);
+      EndPoint.cli(y, etcd.EtcdObserable.create(cfg), observer);
 
         y.help().parse(args);
     });
