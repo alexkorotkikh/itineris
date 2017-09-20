@@ -130,7 +130,7 @@ export class EndPoint {
     public nodes: Node[];
     public tls: Tls;
 
-    public static cli(y: yargs.Argv, etc: etcd.EtcdObserable, obs: rx.Observer<string>): void {
+  public static cli(y: yargs.Argv, etc: etcd.EtcdObserable, obs: rx.Observer<string>): void {
         y.command('endpoint', 'endpoint commands', (_argv): yargs.Argv => {
             const opEndpointName = {
                     'endpointName': {
@@ -163,9 +163,9 @@ export class EndPoint {
                 })
                 .command('list', 'list endpoint', {},
                 (argv) => {
-                    etc.getString('endpoints', { recursive: true }).subscribe(resp => {
-                        if (resp.isErr()) obs.error(resp.err);
-                        else obs.next(resp.value);
+                  etc.getJson('endpoints', { recursive: true }).subscribe(resp => {
+                      if (resp.isErr()) obs.error(JSON.stringify(resp.err));
+                      else obs.next(JSON.stringify(resp));
                     })
                 })
                 .command('remove', 'remove a endpoint', opEndpointName, (argv) => {
@@ -175,58 +175,75 @@ export class EndPoint {
                   });
                 })
                 .command('set', 'options to a endpoint', {
-                    'tls-cert': {
-                        description: 'Path to TLS certificate file',
-                        required: true
-                    },
-                    'tls-chain': {
-                        description: 'Path to TLS chain file',
-                        required: true
-                    },
-                    'tls-key': {
-                        description: 'Path to TLS key file',
-                        required: true
-                    }
+                  'tls-cert': {
+                    description: 'Path to TLS certificate file',
+                    required: true
+                  },
+                  'tls-chain': {
+                    description: 'Path to TLS chain file',
+                    required: true
+                  },
+                  'tls-key': {
+                    description: 'Path to TLS key file',
+                    required: true
+                  }
                 }, (argv) => {
-                    etc.getJson(`endpoints/${argv.endpointName}`).subscribe((resp) => {
+                  this.getEndpoint(etc, argv.endpointName, obs, (endpoint) => {
+                    endpoint.tls.tlsKey = argv.tlsKey || endpoint.tls.tlsKey;
+                    endpoint.tls.tlsCert = argv.tlsCert || endpoint.tls.tlsCert;
+                    endpoint.tls.tlsChain = argv.tlsChain || endpoint.tls.tlsChain;
+                    etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
                       if (resp.isErr()) obs.error(resp.err);
-                      else {
-                        const endpoint = resp.value;
-                        endpoint.tls.tlsKey = argv.tlsKey || endpoint.tls.tlsKey;
-                        endpoint.tls.tlsCert = argv.tlsCert || endpoint.tls.tlsCert;
-                        endpoint.tls.tlsChain = argv.tlsChain || endpoint.tls.tlsChain;
-                        etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
-                          if (resp.isErr()) obs.error(resp.err);
-                          else obs.next('endpoint options were set');
-                        })
-                      }
+                      else obs.next('endpoint options were set');
                     })
+                  })
                 })
                 .command('unset', 'remove options from a endpoint', { }, (argv) => {
-                  etc.getJson(`endpoints/${argv.endpointName}`).subscribe((resp) => {
-                    if (resp.isErr()) obs.error(resp.err);
-                    else {
-                      const endpoint = resp.value;
-                      endpoint.tls.tlsKey = null;
-                      endpoint.tls.tlsCert = null;
-                      endpoint.tls.tlsChain = null;
-                      etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
-                        if (resp.isErr()) obs.error(resp.err);
-                        else obs.next('endpoint options were unset');
-                      })
-                    }
+                  this.getEndpoint(etc, argv.endpointName, obs, (endpoint) => {
+                    endpoint.tls.tlsKey = null;
+                    endpoint.tls.tlsCert = null;
+                    endpoint.tls.tlsChain = null;
+                    etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
+                      if (resp.isErr()) obs.error(resp.err);
+                      else obs.next('endpoint options were unset');
+                    })
                   })
                 })
                 .command('nodes', 'handle nodes', (__argv): yargs.Argv => {
                     const nodes = yargs.usage('$0 service nodes <cmd> [args]');
                     nodes.command('add', 'add node by name', opNodeName, (argv) => {
-                        /* */
+                      this.getEndpoint(etc, argv.endpointName, obs, (endpoint) => {
+                        if (!endpoint.nodes) endpoint.nodes = [];
+                        if (endpoint.nodes.find((n: any) => n.name === argv.nodeName)) {
+                          obs.next('node already exist');
+                        } else {
+                          endpoint.nodes.push({ name: argv.nodeName });
+                          etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
+                            if (resp.isErr()) obs.error(resp.err);
+                            else obs.next('node was added to endpoint');
+                          })
+                        }
+                      });
                     });
                     nodes.command('list', 'list node by name', opEndpointName, (argv) => {
-                        /* */
-                    });
+                      this.getEndpoint(etc, argv.endpointName, obs, (endpoint) => {
+                          if (!endpoint.nodes) endpoint.nodes = [];
+                          obs.next(endpoint.nodes);
+                        })
+                      });
                     nodes.command('remove', 'add node by name', opNodeName, (argv) => {
-                        /* */
+                      this.getEndpoint(etc, argv.endpointName, obs, (endpoint) => {
+                        if (!endpoint.nodes) endpoint.nodes = [];
+                        const node = endpoint.removeNode(argv.nodeName);
+                        if (!node) {
+                          obs.error('node does not exist')
+                        } else {
+                          etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
+                            if (resp.isErr()) obs.error(resp.err);
+                            else obs.next('node was removed from endpoint');
+                          })
+                        }
+                      })
                     });
                     return nodes;
                 });
@@ -235,7 +252,18 @@ export class EndPoint {
         });
     }
 
-    public static loadFrom(obj: any, log: winston.LoggerInstance): EndPoint {
+  private static getEndpoint(etc: etcd.EtcdObserable, endpointName: string,
+                             obs: rx.Observer<string>, apply: (endpoint: any) => void): void {
+    etc.getJson(`endpoints/${endpointName}`).subscribe((resp) => {
+      if (resp.isErr()) obs.error(resp.err);
+      else apply(resp.value)
+    });
+  }
+
+
+
+
+  public static loadFrom(obj: any, log: winston.LoggerInstance): EndPoint {
         const ret = new EndPoint(obj.name, log);
         (obj.nodes || []).forEach((_obj: any) => ret.addNode(_obj.name).loadFrom(_obj));
         ret.tls = Tls.loadFrom(obj.tls, log);
