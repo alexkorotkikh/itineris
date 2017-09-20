@@ -154,10 +154,12 @@ export class EndPoint {
                             name: argv.endpointName,
                             nodes: [],
                             tls: {},
+                          }).subscribe(resp => {
+                            if (resp.isErr()) obs.error(resp.err);
+                            obs.next('endpoint was added')
                           })
                         }
                     });
-                    obs.next('endpoint was added')
                 })
                 .command('list', 'list endpoint', {},
                 (argv) => {
@@ -186,10 +188,34 @@ export class EndPoint {
                         required: true
                     }
                 }, (argv) => {
-                    /* */
+                    etc.getJson(`endpoints/${argv.endpointName}`).subscribe((resp) => {
+                      if (resp.isErr()) obs.error(resp.err);
+                      else {
+                        const endpoint = resp.value;
+                        endpoint.tls.tlsKey = argv.tlsKey || endpoint.tls.tlsKey;
+                        endpoint.tls.tlsCert = argv.tlsCert || endpoint.tls.tlsCert;
+                        endpoint.tls.tlsChain = argv.tlsChain || endpoint.tls.tlsChain;
+                        etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
+                          if (resp.isErr()) obs.error(resp.err);
+                          else obs.next('endpoint options were set');
+                        })
+                      }
+                    })
                 })
                 .command('unset', 'remove options from a endpoint', { }, (argv) => {
-                    /* */
+                  etc.getJson(`endpoints/${argv.endpointName}`).subscribe((resp) => {
+                    if (resp.isErr()) obs.error(resp.err);
+                    else {
+                      const endpoint = resp.value;
+                      endpoint.tls.tlsKey = null;
+                      endpoint.tls.tlsCert = null;
+                      endpoint.tls.tlsChain = null;
+                      etc.setJson(`endpoints/${argv.endpointName}`, endpoint).subscribe((resp) => {
+                        if (resp.isErr()) obs.error(resp.err);
+                        else obs.next('endpoint options were unset');
+                      })
+                    }
+                  })
                 })
                 .command('nodes', 'handle nodes', (__argv): yargs.Argv => {
                     const nodes = yargs.usage('$0 service nodes <cmd> [args]');
