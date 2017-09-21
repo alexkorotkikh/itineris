@@ -54,8 +54,8 @@ export class Node {
       }, opNodeName);
       const node = yargs.usage('$0 service node <cmd> [args]');
       node.command('add', 'add ipport by name', opIpPort, (argv) => {
-        upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
-          if (!endpoint.nodes) endpoint.nodes = [];
+        upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+          const endpoint = EndPoint.loadFrom(endpointJson, log);
           const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
           if (!node) {
             obs.error('node does not exist')
@@ -66,7 +66,7 @@ export class Node {
             out.next(endpoint);
           }
         }).subscribe(() => {
-          obs.next("bind added to node")
+          obs.next('bind added to node')
         });
       });
       node.command('list', 'list ipport by name', opNodeName, (argv) => {
@@ -86,14 +86,13 @@ export class Node {
         })
       });
       node.command('remove', 'remove ipport by name', opIpPort, (argv) => {
-        upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
-          if (!endpoint.nodes) endpoint.nodes = [];
-          const nodeJson = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
-          if (!nodeJson) {
+        upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+          const endpoint = EndPoint.loadFrom(endpointJson, log);
+          const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
+          if (!node) {
             obs.error('node does not exist')
           } else {
             const bind = new IpPort(IPAddress.parse(argv.ip), parseInt(argv.port), log);
-            const node = new Node(nodeJson.name, log).loadFrom(nodeJson);
             const removedBind = node.removeBind(bind);
             if (!removedBind) {
               obs.error('bind does not exist')
@@ -176,7 +175,7 @@ export class EndPoint {
   public tls: Tls;
 
   public static cli(y: yargs.Argv, etc: etcd.EtcdObservable, upset: etcd.Upset,
-                    obs: rx.Observer<string>): void {
+                    log: winston.LoggerInstance, obs: rx.Observer<string>): void {
     y.command('endpoint', 'endpoint commands', (_argv): yargs.Argv => {
       const opEndpointName = {
         'endpointName': {
@@ -192,8 +191,8 @@ export class EndPoint {
       }, opEndpointName);
       const x = yargs.usage('$0 endpoint <cmd> [args]')
         .command('add', 'adds a endpoint', opEndpointName, (argv) => {
-          upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
-            if (endpoint) {
+          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+            if (endpointJson) {
               obs.error('endpoint already exists');
             } else {
               out.next({
@@ -240,7 +239,8 @@ export class EndPoint {
             required: true
           }
         }, (argv) => {
-          upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
+          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+            const endpoint = EndPoint.loadFrom(endpointJson, log);
             endpoint.tls.tlsKey = argv.tlsKey || endpoint.tls.tlsKey;
             endpoint.tls.tlsCert = argv.tlsCert || endpoint.tls.tlsCert;
             endpoint.tls.tlsChain = argv.tlsChain || endpoint.tls.tlsChain;
@@ -250,7 +250,8 @@ export class EndPoint {
           });
         })
         .command('unset', 'remove options from a endpoint', {}, (argv) => {
-          upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
+          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+            const endpoint = EndPoint.loadFrom(endpointJson, log);
             endpoint.tls.tlsKey = null;
             endpoint.tls.tlsCert = null;
             endpoint.tls.tlsChain = null;
@@ -262,12 +263,12 @@ export class EndPoint {
         .command('nodes', 'handle nodes', (__argv): yargs.Argv => {
           const nodes = yargs.usage('$0 service nodes <cmd> [args]');
           nodes.command('add', 'add node by name', opNodeName, (argv) => {
-            upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
-              if (!endpoint.nodes) endpoint.nodes = [];
+            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+              const endpoint = EndPoint.loadFrom(endpointJson, log);
               if (endpoint.nodes.find((n: any) => n.name === argv.nodeName)) {
                 obs.error('node already exist');
               } else {
-                endpoint.nodes.push({ name: argv.nodeName });
+                endpoint.addNode(argv.nodeName);
                 out.next(endpoint);
               }
             }).subscribe(() => {
@@ -286,8 +287,8 @@ export class EndPoint {
             })
           });
           nodes.command('remove', 'add node by name', opNodeName, (argv) => {
-            upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
-              if (!endpoint.nodes) endpoint.nodes = [];
+            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+              const endpoint = EndPoint.loadFrom(endpointJson, log);
               const node = endpoint.removeNode(argv.nodeName);
               if (!node) {
                 obs.error('node does not exist')
@@ -301,7 +302,7 @@ export class EndPoint {
           return nodes;
         });
 
-      Node.cli(x, opNodeName, etc, upset, obs);
+      Node.cli(x, opNodeName, etc, upset, log, obs);
 
       return x;
     });

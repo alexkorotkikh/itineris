@@ -122,13 +122,19 @@ export function cli(args: string[]): Rx.Observable<string> {
     createVersionHandler(y, observer);
     createStartHandler(y, observer);
 
+    const logger = new (winston.Logger)({
+      transports: [new (winston.transports.Console)()]
+    });
+
     const cfg = etcd.Config.start([
       '--etcd-cluster-id', y.argv.etcdClusterId,
       '--etcd-app-id', y.argv.etcdAppId,
       '--etcd-url', y.argv.etcdUrl,
     ]);
     const etc = etcd.EtcdObservable.create(cfg);
-    EndPoint.cli(y, etc, etcd.Upset.create(etc), observer);
+    const upset = etcd.Upset.create(etc);
+
+    EndPoint.cli(y, etc, upset, logger, observer);
 
     y.help().parse(args);
   });
