@@ -122,6 +122,12 @@ describe('router', function (): void {
   it.only('reacts on adding and removing endpoints', function (done) {
     this.timeout(5000);
 
+    let uuid = Uuid.v4().toString();
+
+    function routerCli(args: string[]): Rx.Observable<string> {
+      return router.cli(args.concat(['--etcd-cluster-id', uuid]));
+    }
+
     function startRouter(): Rx.Observable<string> {
       return router.cli(['start']);
     }
@@ -130,20 +136,29 @@ describe('router', function (): void {
       const endpointName = 'testEndpoint' + num;
       const nodeName = 'testNode' + num;
       const ip = '127.0.0.' + num;
-      const port = '808' + num;
+      const port = '808' + (num - 1);
       return Rx.Observable.create((observer: Rx.Observer<EndPoint>) => {
-        router.cli(['endpoint', 'add', '--endpointName', endpointName]).subscribe(() => {
-          router.cli([
-            'endpoint', 'node', 'add',
+        routerCli([
+          'endpoint', 'add',
+          '--endpointName', endpointName,
+        ]).subscribe(() => {
+          routerCli([
+            'endpoint', 'nodes', 'add',
             '--endpointName', endpointName,
             '--nodeName', nodeName,
-            '--ip', ip,
-            '--port', port
           ]).subscribe(() => {
-            const endPoint = new EndPoint(endpointName, log);
-            const node = endPoint.addNode(nodeName);
-            node.addBind(new IpPort(IPAddress.parse(ip), parseInt(port), log));
-            observer.next(endPoint)
+            routerCli([
+              'endpoint', 'node', 'add',
+              '--endpointName', endpointName,
+              '--nodeName', nodeName,
+              '--ip', ip,
+              '--port', port
+            ]).subscribe(() => {
+              const endPoint = new EndPoint(endpointName, log);
+              const node = endPoint.addNode(nodeName);
+              node.addBind(new IpPort(IPAddress.parse(ip), parseInt(port), log));
+              observer.next(endPoint)
+            })
           })
         });
       });
@@ -158,7 +173,6 @@ describe('router', function (): void {
             resolveWithFullResponse: true,
           }).then(response => {
             assert.isBelow(response.statusCode, 500);
-            console.log('2');
             observer.next(null);
           }).catch(err => {
             if (attempts > 0) ping(attempts - 1);
@@ -173,20 +187,23 @@ describe('router', function (): void {
     function checkAddEndpoints(count: number): Rx.Observable<EndPoint[]> {
       return Rx.Observable.create((observer: Rx.Observer<EndPoint[]>) => {
         addNewEndpoint(count).subscribe(endPoint => {
-          checkIsAccessible(endPoint).subscribe(() => {
-            if (count > 0) checkAddEndpoints(count - 1);
-            else observer.next(null);
-          });
+          // checkIsAccessible(endPoint).subscribe(() => {
+          if (count - 1 > 0) {
+            checkAddEndpoints(count - 1);
+          } else {
+            observer.next(null);
+          }
+          // });
         });
       });
     }
 
-    function checkRemoveEndpoints() {
-      router.cli(['endpoint', 'list', '--json']).subscribe((strList) => {
+    function checkRemoveEndpoints(count: number) {
+      routerCli(['endpoint', 'list', '--json']).subscribe((strList) => {
         const list = JSON.parse(strList);
-        assert.equal(list.size, 10);
+        assert.equal(list.length, 1);
         list.forEach((endPoint: any) => {
-          router.cli(['endpoint', 'remove', '--endpointName', endPoint.name]).subscribe(() => {
+          routerCli(['endpoint', 'remove', '--endpointName', endPoint.name]).subscribe(() => {
             const ipPort = endPoint.listNodes()[0].listBinds()[0];
             rq.get({
               uri: `http://${ipPort.ip.to_string()}:${ipPort.port}/`,
@@ -200,9 +217,10 @@ describe('router', function (): void {
       });
     }
 
+    const count = 1;
     startRouter().subscribe(() => {
-      checkAddEndpoints(10).subscribe(() => {
-        checkRemoveEndpoints();
+      checkAddEndpoints(count).subscribe(() => {
+        checkRemoveEndpoints(count);
       });
     });
   });

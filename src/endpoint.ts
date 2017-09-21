@@ -10,7 +10,7 @@ export class IpPort {
   public readonly port: number;
 
   public static loadFrom(obj: any, log: winston.LoggerInstance): IpPort {
-    const ip = IPAddress.parse(obj.ip);
+    const ip = new IPAddress(obj.ip);
     if (!ip) {
       log.error('unparsable ip address', obj.ip);
       return null;
@@ -134,7 +134,7 @@ export class Node {
   public removeBind(ipPort: IpPort): IpPort {
     const filtered = this.binds.filter(n => !n.equals(ipPort));
     if (!name || this.binds.length == filtered.length) {
-      this.log.error('addnode: node name not found:', name);
+      this.log.error('removeBind: node name not found:', name);
       return null;
     }
     const found = this.binds.find(n => n.equals(ipPort));
@@ -189,7 +189,7 @@ export class EndPoint {
           require: true
         }
       }, opEndpointName);
-      const x = yargs.usage('$0 endpoint <cmd> [args]')
+      const endpoints = yargs.usage('$0 endpoint <cmd> [args]')
         .command('add', 'adds a endpoint', opEndpointName, (argv) => {
           upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
             if (endpointJson) {
@@ -206,12 +206,12 @@ export class EndPoint {
           });
         })
         .command('list', 'list endpoint', {}, (argv) => {
-          etc.getJson('endpoints', { recursive: true }).subscribe(resp => {
+          etc.getRaw('endpoints', { recursive: true }).subscribe(resp => {
             if (resp.isErr()) {
               obs.error(JSON.stringify(resp.err));
-            }
-            else {
-              obs.next(JSON.stringify(resp));
+            } else {
+              const endPoints = resp.node.nodes.map(n => EndPoint.loadFrom(JSON.parse(n.value), log));
+              obs.next(JSON.stringify(endPoints));
             }
           })
         })
@@ -302,9 +302,9 @@ export class EndPoint {
           return nodes;
         });
 
-      Node.cli(x, opNodeName, etc, upset, log, obs);
+      Node.cli(endpoints, opNodeName, etc, upset, log, obs);
 
-      return x;
+      return endpoints;
     });
   }
 
@@ -323,7 +323,7 @@ export class EndPoint {
 
   public addNode(name: string): Node {
     if (!name || this.nodes.find(n => n.name === name)) {
-      this.log.error('addnode: duplicate node name:', name);
+      this.log.error('addNode: duplicate node name:', name);
       return null;
     }
     const ret = new Node(name, this.log);
@@ -338,7 +338,7 @@ export class EndPoint {
   public removeNode(name: string): Node {
     const filtered = this.nodes.filter(n => n.name != name);
     if (!name || this.nodes.length == filtered.length) {
-      this.log.error('addnode: node name not found:', name);
+      this.log.error('removeNode: node name not found:', name);
       return null;
     }
     const found = this.nodes.find(n => n.name === name);

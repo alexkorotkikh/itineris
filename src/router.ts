@@ -1,85 +1,22 @@
-import * as fs from 'fs';
 
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as winston from 'winston';
 import * as yargs from 'yargs';
 
-import * as server from './server';
 import { EndPoint } from './endpoint';
-
-function createEtcd(argv: any): etcd.EtcdPromise {
-  const cfg = etcd.Config.start([
-    '--etcd-cluster-id', argv.etcdClusterId,
-    '--etcd-app-id', argv.etcdAppId,
-    '--etcd-url', argv.etcdUrl,
-  ]);
-  return etcd.EtcdPromise.create(cfg);
-}
 
 function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
   y.command('version', 'Show router\'s version', {}, () => {
     observer.next(process.env.npm_package_version);
-    observer.complete();
   });
 }
 
 function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
   y.command('start', 'Starts router', etcdOptions, (argv: any) => {
-    const etc = createEtcd(argv);
-    const logger = new (winston.Logger)({
-      transports: [new (winston.transports.Console)()]
-    });
-
-    //const infoSource = new EndpointInfoSource(etc, logger);
-    //const storage = new EndpointInfoStorage(logger);
-    //const serverManager = new server.ServerManager(logger);
-
-    //infoSource.start()
-    //    .flatMap(nodes => storage.update(nodes))
-    //    .flatMap(changedEndpoints => serverManager.updateEndpoints(changedEndpoints))
-    //    .subscribe(result => logger.info('configuration updated', result));
-    observer.next('Router started');
+    observer.next('not implemented')
   });
 }
-
-// services
-//    add
-//    list
-//    remove
-//    set    tls-options
-//    remove tls-options
-
-//     const tlsCert = fs.readFileSync(argv.tlsCert, 'utf8');
-//     const tlsChain = fs.readFileSync(argv.tlsChain, 'utf8');
-//     const tlsKey = fs.readFileSync(argv.tlsKey, 'utf8');
-
-//     const etc = createEtcd(argv);
-//     etc.connect().then(() => {
-//         const key = `endpoints/${argv.serviceName}`;
-//         etc.getJson(argv.serviceName)
-//         etc.setJson(, {
-//             argv.serviceName: {
-//                 'nodes': {
-//                     argv.nodeName: [
-
-//                     ]
-//                 }
-//                         'ip': argv.ip, 'port': argv.port
-//                         'tls': {
-//                     'cert': tlsCert,
-//                     'chain': tlsChain,
-//                     'key': tlsKey,
-//                 }
-//             },
-//             ,
-//         }).then(() => {
-//             observer.next('Endpoint was added');
-//             observer.complete();
-//         });
-// });
-
-// });
 
 function jsonOrText(_yargs: any): any {
   return _yargs.option('json', {
