@@ -47,7 +47,7 @@
     "@types/winston": ">=0.0.32",
     "@types/yargs": "^8.0.2",
     "ipaddress": "^0.2.5",
-    "promise-etcd": ">=2.0.0",
+    "promise-etcd": ">=2.1.0",
     "request": "^2.81.0",
     "rxjs": "^5.4.3",
     "uuid": ">=3.1.0",
