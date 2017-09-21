@@ -39,7 +39,8 @@ export class Node {
   public readonly name: string;
   private binds: IpPort[];
 
-  public static cli(y: yargs.Argv, opNodeName: any, obs: rx.Observer<string>): yargs.Argv {
+  public static cli(y: yargs.Argv, opNodeName: any, etc: etcd.EtcdObservable, upset: etcd.Upset,
+                    log: winston.LoggerInstance, obs: rx.Observer<string>): yargs.Argv {
     return y.command('node', 'handle node', (__argv): yargs.Argv => {
       const opIpPort = Object.assign({
         'ip': {
@@ -53,13 +54,56 @@ export class Node {
       }, opNodeName);
       const node = yargs.usage('$0 service node <cmd> [args]');
       node.command('add', 'add ipport by name', opIpPort, (argv) => {
-        obs.next('node added')
+        upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
+          if (!endpoint.nodes) endpoint.nodes = [];
+          const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
+          if (!node) {
+            obs.error('node does not exist')
+          } else {
+            const ip = IPAddress.parse(argv.ip);
+            const port = parseInt(argv.port);
+            node.addBind(new IpPort(ip, port, log));
+            out.next(endpoint);
+          }
+        }).subscribe(() => {
+          obs.next("bind added to node")
+        });
       });
       node.command('list', 'list ipport by name', opNodeName, (argv) => {
-        /* */
+        etc.getJson(`endpoints/${argv.endpointName}`).subscribe((resp) => {
+          if (resp.isErr()) {
+            obs.error(resp.err)
+          } else {
+            const endpoint = resp.value;
+            if (!endpoint.nodes) endpoint.nodes = [];
+            const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
+            if (!node) {
+              obs.error('node does not exist')
+            } else {
+              obs.next(node.binds);
+            }
+          }
+        })
       });
       node.command('remove', 'remove ipport by name', opIpPort, (argv) => {
-        /* */
+        upset.upSet(`endpoints/${argv.endpointName}`, (endpoint: any, out: rx.Subject<any>) => {
+          if (!endpoint.nodes) endpoint.nodes = [];
+          const nodeJson = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
+          if (!nodeJson) {
+            obs.error('node does not exist')
+          } else {
+            const bind = new IpPort(IPAddress.parse(argv.ip), parseInt(argv.port), log);
+            const node = new Node(nodeJson.name, log).loadFrom(nodeJson);
+            const removedBind = node.removeBind(bind);
+            if (!removedBind) {
+              obs.error('bind does not exist')
+            } else {
+              out.next(endpoint);
+            }
+          }
+        }).subscribe(() => {
+          obs.next('bind was removed');
+        });
       });
       return node;
     });
@@ -257,7 +301,7 @@ export class EndPoint {
           return nodes;
         });
 
-      Node.cli(x, opNodeName, obs);
+      Node.cli(x, opNodeName, etc, upset, obs);
 
       return x;
     });
@@ -300,48 +344,4 @@ export class EndPoint {
     this.nodes = filtered;
     return found;
   }
-
 }
-
-/*
-export class EndpointInfoSource {
-    private etc: EtcdPromise;
-    private logger: winston.LoggerInstance;
-
-    constructor(etc: EtcdPromise, logger: winston.LoggerInstance) {
-        this.etc = etc;
-        this.logger = logger;
-    }
-
-    start(): Rx.Observable<EtcValueNode> {
-        return Rx.Observable.create((observer: Rx.Observer<EtcValueNode>) => {
-            this.etc.createChangeWaiter('', { recursive: true })
-                .subscribe((res) => {
-                    observer.next(res.node);
-                })
-        });
-    }
-}
-
-export class EndpointInfoStorage {
-    private logger: winston.LoggerInstance;
-    private nodesInfo: EndpointInfo[];
-
-    constructor(logger: winston.LoggerInstance) {
-        this.logger = logger;
-        this.nodesInfo = [];
-    }
-
-    update(val: any): Rx.Observable<EndpointInfo> {
-        return Rx.Observable.create((observer: Rx.Observer<EndpointInfo>) => {
-            this.logger.info(JSON.stringify(val));
-            const changed = val && createEndpointInfo(val);
-
-            this.nodesInfo = this.nodesInfo.filter(i => i.serviceName !== changed.serviceName);
-            this.nodesInfo.push(changed);
-
-            observer.next(changed);
-        });
-    }
-}
-*/
