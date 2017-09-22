@@ -1,30 +1,48 @@
 import * as http from 'http';
 
-import * as rx from 'rxjs';
+import * as Rx from 'rxjs';
 import * as winston from 'winston';
 
-// import { EndpointInfo } from './endpoint';
+import { EndPoint } from './endpoint';
+import { IncomingMessage } from 'http';
+import { ServerResponse } from 'http';
 
 export class ServerManager {
-    private logger: winston.LoggerInstance;
+  private logger: winston.LoggerInstance;
+  private endpoints: Map<string, EndPoint>;
 
-    constructor(logger: winston.LoggerInstance) {
-        this.logger = logger;
-    }
+  constructor(logger: winston.LoggerInstance) {
+    this.logger = logger;
+    this.endpoints = new Map;
+  }
 
-    //updateEndpoints(endpoint: EndpointInfo): Rx.Observable<string> {
-    //    return Rx.Observable.create((observer: Rx.Observer<string>) => {
-    //        this.logger.info(JSON.stringify(endpoint));
+  updateEndpoints(endpoint: EndPoint): Rx.Observable<string> {
+    return Rx.Observable.create((observer: Rx.Observer<string>) => {
+      this.logger.info(JSON.stringify(endpoint));
 
-    //        const server = http.createServer((req, res) => {
-    //            this.logger.debug(`${req.method} ${req.url}`);
-    //        });
+      endpoint.nodes.forEach(node => {
+        node.listBinds().forEach(bind => {
+          if (this.endpoints.has(endpoint.name)) {
+            // update happened, swap the server
+          } else {
+            const server = http.createServer(this.handler);
+            server.listen(bind.port, bind.ip.to_string(), (err: any) => {
+                if (err) {
+                  observer.error(err);
+                }
+                observer.next(`server is listening on ${bind.ip.to_string()}:${bind.port}`);
+              }
+            );
+          }
 
-    //        endpoint.nodeInfos.forEach(nodeInfo => {
-    //            server.listen(nodeInfo.port);
-    //        });
+        })
+      });
 
-    //        observer.next("OK");
-    //    });
-    //}
+      observer.next('OK');
+    });
+  }
+
+  private handler(req: IncomingMessage, res: ServerResponse) {
+    this.logger.debug(`${req.method} ${req.url}`);
+  }
 }

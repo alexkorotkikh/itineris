@@ -1,10 +1,11 @@
-
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as winston from 'winston';
 import * as yargs from 'yargs';
 
 import { EndPoint } from './endpoint';
+import { ConfigSource } from './config-source';
+import { ServerManager } from './server';
 
 function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
   y.command('version', 'Show router\'s version', {}, () => {
@@ -12,9 +13,18 @@ function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): voi
   });
 }
 
-function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
+function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger: winston.LoggerInstance,
+                            etc: etcd.EtcdObservable, upset: etcd.Upset): void {
   y.command('start', 'Starts router', etcdOptions, (argv: any) => {
-    observer.next('not implemented')
+    const infoSource = new ConfigSource(etc, logger);
+    const serverManager = new ServerManager(logger);
+
+    infoSource.start().subscribe(endpoint => {
+      serverManager.updateEndpoints(endpoint).subscribe(result => {
+        logger.info('configuration updated', result)
+      }, err => observer.error(err));
+    }, err => observer.error(err));
+    observer.next('Router started');
   });
 }
 
@@ -56,9 +66,6 @@ export function cli(args: string[]): Rx.Observable<string> {
     jsonOrText(y);
     etcdOptions(y);
 
-    createVersionHandler(y, observer);
-    createStartHandler(y, observer);
-
     const logger = new (winston.Logger)({
       transports: [new (winston.transports.Console)()]
     });
@@ -70,6 +77,9 @@ export function cli(args: string[]): Rx.Observable<string> {
     ]);
     const etc = etcd.EtcdObservable.create(cfg);
     const upset = etcd.Upset.create(etc);
+
+    createVersionHandler(y, observer);
+    createStartHandler(y, observer, logger, etc, upset);
 
     EndPoint.cli(y, etc, upset, logger, observer);
 

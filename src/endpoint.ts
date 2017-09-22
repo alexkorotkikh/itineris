@@ -195,11 +195,7 @@ export class EndPoint {
             if (endpointJson) {
               obs.error('endpoint already exists');
             } else {
-              out.next({
-                name: argv.endpointName,
-                nodes: [],
-                tls: {},
-              })
+              out.next(new EndPoint(argv.endpointName, log));
             }
           }).subscribe(() => {
             obs.next('endpoint was added')
