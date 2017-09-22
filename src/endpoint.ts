@@ -10,7 +10,7 @@ export class IpPort {
   public readonly port: number;
 
   public static loadFrom(obj: any, log: winston.LoggerInstance): IpPort {
-    const ip = new IPAddress(obj.ip);
+    const ip = IPAddress.parse(obj.ip);
     if (!ip) {
       log.error('unparsable ip address', obj.ip);
       return null;
@@ -31,6 +31,10 @@ export class IpPort {
 
   public equals(oth: IpPort): boolean {
     return this.ip.eq(oth.ip) && oth.port == this.port;
+  }
+
+  toObject(): any {
+    return { ip: this.ip.to_s(), port: this.port }
   }
 }
 
@@ -60,10 +64,18 @@ export class Node {
           if (!node) {
             obs.error('node does not exist')
           } else {
-            const ip = IPAddress.parse(argv.ip);
-            const port = parseInt(argv.port);
-            node.addBind(new IpPort(ip, port, log));
-            out.next(endpoint);
+            try {
+              const ip = IPAddress.parse(argv.ip);
+              const port = parseInt(argv.port);
+              const bind = node.addBind(new IpPort(ip, port, log));
+              if (!bind) {
+                obs.error('bind was not added');
+              } else {
+                out.next(endpoint.toObject());
+              }
+            } catch (e) {
+              obs.error(e)
+            }
           }
         }).subscribe(() => {
           obs.next('bind added to node')
@@ -83,7 +95,7 @@ export class Node {
               obs.next(node.binds);
             }
           }
-        })
+        });
       });
       node.command('remove', 'remove ipport by name', opIpPort, (argv) => {
         upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
@@ -97,7 +109,7 @@ export class Node {
             if (!removedBind) {
               obs.error('bind does not exist')
             } else {
-              out.next(endpoint);
+              out.next(endpoint.toObject());
             }
           }
         }).subscribe(() => {
@@ -147,6 +159,24 @@ export class Node {
     return this;
   }
 
+  toObject(): any {
+    return { name: this.name, binds: this.binds.map(b => b.toObject()) }
+  }
+
+  equals(other: Node): boolean {
+    if (this.name !== other.name) {
+      return false;
+    }
+    if (this.binds.length !== other.binds.length) {
+      return false;
+    }
+    for (let i = 0; i < this.binds.length; i++) {
+      if (!this.binds[i].equals(other.binds[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
 }
 
 export class Tls {
@@ -165,6 +195,20 @@ export class Tls {
 
   constructor(log: winston.LoggerInstance) {
     this.log = log;
+  }
+
+  toObject(): any {
+    return {
+      tlsChain: this.tlsChain,
+      tlsCert: this.tlsCert,
+      tlsKey: this.tlsKey,
+    };
+  }
+
+  equals(other: Tls): boolean {
+    return this.tlsKey === other.tlsKey &&
+      this.tlsCert === other.tlsCert &&
+      this.tlsChain === other.tlsChain;
   }
 }
 
@@ -191,25 +235,36 @@ export class EndPoint {
       }, opEndpointName);
       const endpoints = yargs.usage('$0 endpoint <cmd> [args]')
         .command('add', 'adds a endpoint', opEndpointName, (argv) => {
-          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
-            if (endpointJson) {
-              obs.error('endpoint already exists');
-            } else {
-              out.next(new EndPoint(argv.endpointName, log));
-            }
-          }).subscribe(() => {
-            obs.next('endpoint was added')
-          });
+          etc.mkdir('endpoints').subscribe(() => {
+            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
+              try {
+                if (endpointJson) {
+                  obs.error('endpoint already exists');
+                } else {
+                  const endPoint = new EndPoint(argv.endpointName, log);
+                  out.next(endPoint.toObject());
+                }
+              } catch (e) {
+                obs.error(e)
+              }
+            }).subscribe(() => {
+              obs.next('endpoint was added')
+            }, obs.error);
+          }, obs.error);
         })
         .command('list', 'list endpoint', {}, (argv) => {
           etc.getRaw('endpoints', { recursive: true }).subscribe(resp => {
-            if (resp.isErr()) {
-              obs.error(JSON.stringify(resp.err));
-            } else {
-              const endPoints = resp.node.nodes.map(n => EndPoint.loadFrom(JSON.parse(n.value), log));
-              obs.next(JSON.stringify(endPoints));
+            try {
+              if (resp.isErr()) {
+                obs.error(JSON.stringify(resp.err));
+              } else {
+                const endPoints = resp.node.nodes.map(n => EndPoint.loadFrom(JSON.parse(n.value), log).toObject());
+                obs.next(JSON.stringify(endPoints));
+              }
+            } catch (e) {
+              obs.error(e);
             }
-          })
+          }, obs.error)
         })
         .command('remove', 'remove a endpoint', opEndpointName, (argv) => {
           etc.delete(`endpoints/${argv.endpointName}`).subscribe(resp => {
@@ -240,7 +295,7 @@ export class EndPoint {
             endpoint.tls.tlsKey = argv.tlsKey || endpoint.tls.tlsKey;
             endpoint.tls.tlsCert = argv.tlsCert || endpoint.tls.tlsCert;
             endpoint.tls.tlsChain = argv.tlsChain || endpoint.tls.tlsChain;
-            out.next(endpoint);
+            out.next(endpoint.toObject());
           }).subscribe(() => {
             obs.next('endpoint options were set');
           });
@@ -251,7 +306,7 @@ export class EndPoint {
             endpoint.tls.tlsKey = null;
             endpoint.tls.tlsCert = null;
             endpoint.tls.tlsChain = null;
-            out.next(endpoint);
+            out.next(endpoint.toObject());
           }).subscribe(() => {
             obs.next('endpoint options were unset');
           });
@@ -265,7 +320,7 @@ export class EndPoint {
                 obs.error('node already exist');
               } else {
                 endpoint.addNode(argv.nodeName);
-                out.next(endpoint);
+                out.next(endpoint.toObject());
               }
             }).subscribe(() => {
               obs.next('node was added to endpoint');
@@ -289,7 +344,7 @@ export class EndPoint {
               if (!node) {
                 obs.error('node does not exist')
               } else {
-                out.next(endpoint);
+                out.next(endpoint.toObject());
               }
             }).subscribe(() => {
               obs.next('node was removed from endpoint');
@@ -307,7 +362,7 @@ export class EndPoint {
   public static loadFrom(obj: any, log: winston.LoggerInstance): EndPoint {
     const ret = new EndPoint(obj.name, log);
     (obj.nodes || []).forEach((_obj: any) => ret.addNode(_obj.name).loadFrom(_obj));
-    ret.tls = Tls.loadFrom(obj.tls, log);
+    ret.tls = obj.tls && Tls.loadFrom(obj.tls, log);
     return ret;
   }
 
@@ -341,4 +396,31 @@ export class EndPoint {
     this.nodes = filtered;
     return found;
   }
+
+  toObject(): any {
+    return {
+      name: this.name,
+      nodes: this.nodes.map(n => n.toObject()),
+      tls: (this.tls && this.tls.toObject()) || {},
+    }
+  }
+
+  equals(other: EndPoint): boolean {
+    if (this.name !== other.name) {
+      return false;
+    }
+    if (!this.tls.equals(other.tls)) {
+      return false;
+    }
+    if (this.nodes.length !== other.nodes.length) {
+      return false;
+    }
+    for (let i = 0; i < this.nodes.length; i++) {
+      if (!this.nodes[i].equals(other.nodes[i])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
 }

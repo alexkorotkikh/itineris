@@ -8,6 +8,7 @@ import * as router from '../src/router';
 import { EndPoint, IpPort } from '../src/endpoint';
 import * as winston from 'winston';
 import { IPAddress } from 'ipaddress';
+import request = require('request');
 
 const TIMEOUT = 2000;
 
@@ -169,14 +170,19 @@ describe('router', function (): void {
         function ping(attempts: number) {
           const ipPort = endPoint.listNodes()[0].listBinds()[0];
           rq.get({
-            uri: `http://${ipPort.ip.to_string()}:${ipPort.port}/`,
+            uri: `http://${ipPort.ip.to_s()}:${ipPort.port}/`,
             resolveWithFullResponse: true,
           }).then(response => {
             assert.isBelow(response.statusCode, 500);
             observer.next(null);
           }).catch(err => {
-            if (attempts > 0) ping(attempts - 1);
-            else assert.fail(err);
+            if (attempts > 0) {
+              ping(attempts - 1);
+            }
+            else {
+              console.log(err);
+              assert.fail(err);
+            }
           });
         }
 
@@ -187,31 +193,43 @@ describe('router', function (): void {
     function checkAddEndpoints(count: number): Rx.Observable<EndPoint[]> {
       return Rx.Observable.create((observer: Rx.Observer<EndPoint[]>) => {
         addNewEndpoint(count).subscribe(endPoint => {
-          // checkIsAccessible(endPoint).subscribe(() => {
-          if (count - 1 > 0) {
-            checkAddEndpoints(count - 1);
-          } else {
-            observer.next(null);
-          }
-          // });
+          checkIsAccessible(endPoint).subscribe(() => {
+            if (count - 1 > 0) {
+              checkAddEndpoints(count - 1);
+            } else {
+              observer.next(null);
+            }
+          });
         });
       });
     }
 
     function checkRemoveEndpoints(count: number) {
       routerCli(['endpoint', 'list', '--json']).subscribe((strList) => {
-        const list = JSON.parse(strList);
+        const list = JSON.parse(strList).map((e: any) => EndPoint.loadFrom(e, log));
         assert.equal(list.length, 1);
-        list.forEach((endPoint: any) => {
+        list.forEach((endPoint: EndPoint) => {
           routerCli(['endpoint', 'remove', '--endpointName', endPoint.name]).subscribe(() => {
-            const ipPort = endPoint.listNodes()[0].listBinds()[0];
-            rq.get({
-              uri: `http://${ipPort.ip.to_string()}:${ipPort.port}/`,
-              resolveWithFullResponse: true,
-            }).then(response => {
-              assert.isAtMost(response.statusCode, 500);
-              done();
-            });
+            const ipPort = endPoint.nodes[0].listBinds()[0];
+            const req = request.get({
+              uri: `http://${ipPort.ip.to_s()}:${ipPort.port}/`,
+              timeout: 100,
+            }).on('error', (err) => {
+              console.log(err);
+            }).on('complete', (resp) => {
+              console.log(resp);
+            })
+
+
+            // .timeout(100)
+            // .then(response => {
+            //   console.log(response);
+            //   assert.isAtMost(response.statusCode, 500);
+            //   done();
+            // })
+            // .catch(bb.TimeoutError, err => {
+            //   console.log(err);
+            // });
           });
         })
       });

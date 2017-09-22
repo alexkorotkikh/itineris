@@ -14,16 +14,18 @@ function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): voi
 }
 
 function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger: winston.LoggerInstance,
-                            etc: etcd.EtcdObservable, upset: etcd.Upset): void {
+                            etc: etcd.EtcdObservable): void {
   y.command('start', 'Starts router', etcdOptions, (argv: any) => {
     const infoSource = new ConfigSource(etc, logger);
     const serverManager = new ServerManager(logger);
 
-    infoSource.start().subscribe(endpoint => {
-      serverManager.updateEndpoints(endpoint).subscribe(result => {
-        logger.info('configuration updated', result)
-      }, err => observer.error(err));
-    }, err => observer.error(err));
+    infoSource.start().subscribe((res: any) =>
+      infoSource.onNext(res).subscribe(endpoint => {
+        serverManager.updateEndpoints(endpoint).subscribe(result => {
+          logger.info('configuration updated', result)
+        }, err => observer.error(err));
+      }, err => observer.error(err)));
+
     observer.next('Router started');
   });
 }
