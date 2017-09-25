@@ -99,22 +99,27 @@ export class Node {
       });
       node.command('remove', 'remove ipport by name', opIpPort, (argv) => {
         upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
-          const endpoint = EndPoint.loadFrom(endpointJson, log);
-          const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
-          if (!node) {
-            obs.error('node does not exist')
-          } else {
-            const bind = new IpPort(IPAddress.parse(argv.ip), parseInt(argv.port), log);
-            const removedBind = node.removeBind(bind);
-            if (!removedBind) {
-              obs.error('bind does not exist')
+          try {
+            const endpoint = EndPoint.loadFrom(endpointJson, log);
+            const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
+            if (!node) {
+              obs.error('node does not exist')
             } else {
-              out.next(endpoint.toObject());
+              const bind = new IpPort(IPAddress.parse(argv.ip), parseInt(argv.port), log);
+              const removedBind = node.removeBind(bind);
+              if (!removedBind) {
+                obs.error('bind does not exist')
+              } else {
+                out.next(endpoint.toObject());
+              }
             }
+          }
+          catch (e) {
+            console.log(e);
           }
         }).subscribe(() => {
           obs.next('bind was removed');
-        });
+        }, err => obs.error(err));
       });
       return node;
     });
@@ -145,7 +150,7 @@ export class Node {
 
   public removeBind(ipPort: IpPort): IpPort {
     const filtered = this.binds.filter(n => !n.equals(ipPort));
-    if (!name || this.binds.length == filtered.length) {
+    if (/*!name ||*/ this.binds.length == filtered.length) {
       this.log.error('removeBind: node name not found:', name);
       return null;
     }

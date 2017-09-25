@@ -6,6 +6,7 @@ import * as yargs from 'yargs';
 import { EndPoint } from './endpoint';
 import { ConfigSource } from './config-source';
 import { ServerManager } from './server';
+import { TargetRouter } from './target-router';
 
 function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
   y.command('version', 'Show router\'s version', {}, () => {
@@ -17,7 +18,7 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger
                             etc: etcd.EtcdObservable): void {
   y.command('start', 'Starts router', etcdOptions, (argv: any) => {
     const infoSource = new ConfigSource(etc, logger);
-    const serverManager = new ServerManager(logger);
+    const serverManager = new ServerManager(logger, new TargetRouter(etc));
 
     infoSource.start().subscribe((res: any) =>
       infoSource.onNext(res).subscribe(endpoint => {
@@ -81,7 +82,7 @@ export function cli(args: string[]): Rx.Observable<string> {
     const upset = etcd.Upset.create(etc);
 
     createVersionHandler(y, observer);
-    createStartHandler(y, observer, logger, etc, upset);
+    createStartHandler(y, observer, logger, etc);
 
     EndPoint.cli(y, etc, upset, logger, observer);
 

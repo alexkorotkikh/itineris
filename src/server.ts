@@ -4,6 +4,7 @@ import * as Rx from 'rxjs';
 import * as winston from 'winston';
 
 import { EndPoint } from './endpoint';
+import { TargetRouter } from './target-router';
 
 interface EndpointServers {
   endpoint: EndPoint;
@@ -13,10 +14,12 @@ interface EndpointServers {
 export class ServerManager {
   private logger: winston.LoggerInstance;
   private endpointsConfig: Map<string, EndpointServers>;
+  private targetRouter: TargetRouter;
 
-  constructor(logger: winston.LoggerInstance) {
+  constructor(logger: winston.LoggerInstance, targetRouter: TargetRouter) {
     this.logger = logger;
     this.endpointsConfig = new Map;
+    this.targetRouter = targetRouter;
     this.handler = this.handler.bind(this);
   }
 
@@ -69,6 +72,7 @@ export class ServerManager {
 
   private handler(req: http.IncomingMessage, res: http.ServerResponse) {
     this.logger.info(`${req.method} ${req.url}`);
+    this.targetRouter.route(req, res);
     res.end()
   }
 }
