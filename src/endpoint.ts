@@ -336,9 +336,10 @@ export class EndPoint {
               if (resp.isErr()) {
                 obs.error(resp.err)
               } else {
-                const endpoint = resp.value;
+                const endpoint = EndPoint.loadFrom(resp.value, log);
                 if (!endpoint.nodes) endpoint.nodes = [];
-                obs.next(endpoint.nodes);
+                const nodes = endpoint.nodes.map(n => n.toObject());
+                obs.next(JSON.stringify(nodes));
               }
             })
           });

@@ -6,7 +6,7 @@ import * as yargs from 'yargs';
 import { EndPoint } from './endpoint';
 import { ConfigSource } from './config-source';
 import { ServerManager } from './server';
-import { TargetRouter } from './target-router';
+import { Target, TargetRouter } from './target-router';
 
 function createVersionHandler(y: yargs.Argv, observer: Rx.Observer<string>): void {
   y.command('version', 'Show router\'s version', {}, () => {
@@ -85,6 +85,7 @@ export function cli(args: string[]): Rx.Observable<string> {
     createStartHandler(y, observer, logger, etc);
 
     EndPoint.cli(y, etc, upset, logger, observer);
+    Target.cli(y, etc, upset, logger, observer);
 
     y.help().parse(args);
   });
