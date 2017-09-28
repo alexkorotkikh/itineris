@@ -9,14 +9,11 @@ import IPAddress from 'ipaddress';
 
 export class TargetRouter {
   private etc: etcd.EtcdObservable;
-  private changeWaiter: etcd.ChangeWaiter;
-  private routes: Route[];
+  private targets: Target[];
 
   constructor(etc: etcd.EtcdObservable) {
     this.etc = etc;
-    this.routes = [];
-    this.changeWaiter = etc.createChangeWaiter('targets');
-    this.changeWaiter.subscribe(this.updateRoutes);
+    this.targets = [];
   }
 
   route(req: http.IncomingMessage, res: http.ServerResponse): void {
@@ -27,20 +24,24 @@ export class TargetRouter {
 
   private findTarget(req: http.IncomingMessage): Rx.Observable<Apply> {
     return Rx.Observable.create((observer: Rx.Observer<Apply>) => {
-      this.getRoute(req, observer) || this.internalError(observer);
+      this.getRoute(req, observer) || TargetRouter.internalError(observer);
     });
   }
 
-  private getRoute(req: http.IncomingMessage, observer: Rx.Observer<Apply>) {
-    const route = this.routes.find(route => route.isApplicable(req));
+  private getRoute(req: http.IncomingMessage, observer: Rx.Observer<Apply>): any {
+    const target = this.targets.find(target => target.isApplicable(req));
+    if (!target) return null;
     observer.next((request, response) => {
       request
-        .pipe(rq({ qs: url.parse(request.url).query, uri: route.url.toString() }))
+        .pipe(rq({
+          qs: url.parse(request.url).query,
+          uri: target.hosts[Math.floor(Math.random() * target.hosts.length)].to_s(),
+        }))
         .pipe(response);
     });
   }
 
-  private internalError(observer: Rx.Observer<Apply>) {
+  private static internalError(observer: Rx.Observer<Apply>) {
     observer.next((req, res) => {
       res.statusCode = 500;
       res.write('500 Internal Server Error');
@@ -48,14 +49,13 @@ export class TargetRouter {
     });
   }
 
-  private updateRoutes() {
+  updateTargets(targets: Target[]): Rx.Observable<string> {
+    return Rx.Observable.create((observer: Rx.Observer<string>) => {
+      console.log(this.constructor.name);
+      this.targets = targets;
+      observer.next(JSON.stringify(targets))
+    });
   }
-}
-
-interface Route {
-  url: URL;
-
-  isApplicable(req: http.IncomingMessage): boolean;
 }
 
 interface Apply {
@@ -71,12 +71,13 @@ export class Target {
   constructor(targetName: string, log: winston.LoggerInstance) {
     this.name = targetName;
     this.log = log;
+    this.hosts = [];
   }
 
 
   static cli(y: yargs.Argv, etc: etcd.EtcdObservable, upset: etcd.Upset,
              log: winston.LoggerInstance, obs: Rx.Observer<string>) {
-    y.command('target', 'target commands', (_argvv) => {
+    y.command('target', 'target commands', () => {
       const opTargetName = {
         'targetName': {
           description: 'Name of the target',
@@ -90,7 +91,7 @@ export class Target {
           required: true
         },
       };
-      const targets = yargs.usage('$0 target <cmd> [args]')
+      return yargs.usage('$0 target <cmd> [args]')
         .command('add', 'adds a target', opTargetName, (argv) => {
           etc.mkdir('targets').subscribe(() => {
             upset.upSet(`targets/${argv.targetName}`, (targetJson: any, out: Rx.Subject<any>) => {
@@ -109,7 +110,7 @@ export class Target {
             });
           });
         })
-        .command('list', 'list all targets', {}, (argv) => {
+        .command('list', 'list all targets', {}, () => {
           etc.getRaw('targets', { recursive: true }).subscribe(resp => {
             try {
               if (resp.isErr()) {
@@ -158,7 +159,7 @@ export class Target {
             obs.next('target options were unset');
           });
         })
-        .command('hosts', 'handle hosts', (__argv): yargs.Argv => {
+        .command('hosts', 'handle hosts', (): yargs.Argv => {
           const hosts = yargs.usage('$0 service hosts <cmd> [args]');
           const opHost = {
             ...opTargetName,
@@ -221,8 +222,6 @@ export class Target {
             });
           return hosts;
         });
-
-      return targets;
     });
   }
 
@@ -254,5 +253,9 @@ export class Target {
     }
     this.hosts = filtered;
     return host;
+  }
+
+  isApplicable(req: http.IncomingMessage): boolean {
+    return false;
   }
 }

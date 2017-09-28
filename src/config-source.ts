@@ -1,7 +1,6 @@
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as winston from 'winston';
-import { EndPoint } from './endpoint';
 import * as path from 'path';
 
 export class ConfigSource {
@@ -13,30 +12,24 @@ export class ConfigSource {
     this.logger = logger;
   }
 
-  start(): etcd.ChangeWaiter {
-    return this.etc.createChangeWaiter('endpoints', { recursive: true });
+  start(key: string): etcd.ChangeWaiter {
+    return this.etc.createChangeWaiter(key, { recursive: true });
   }
 
-  onNext(res: any): Rx.Observable<EndPoint[]> {
-    return Rx.Observable.create((observer: Rx.Observer<EndPoint[]>) => {
+  onNext<T>(res: any, jsonToObject: (json: any, logger: winston.LoggerInstance) => T): Rx.Observable<T[]> {
+    return Rx.Observable.create((observer: Rx.Observer<T[]>) => {
       try {
         this.logger.info(JSON.stringify(res));
-        let endpointsJson: any[];
-        try {
-
+        let json: any[];
         if (res.node.dir) {
-          endpointsJson = res.node.nodes.map((n: any) => JSON.parse(n.value))
+          json = res.node.nodes.map((n: any) => JSON.parse(n.value))
         } else if (res.action === 'delete') {
           const name = path.basename(res.node.key);
-          endpointsJson = [{ name: name }]
+          json = [{ name: name }]
         } else {
-          endpointsJson = [JSON.parse(res.node.value)];
+          json = [JSON.parse(res.node.value)];
         }
-        console.log(JSON.stringify(endpointsJson));
-        } catch(e) {
-          console.error(e);
-        }
-        const endpoints = endpointsJson.map(json => EndPoint.loadFrom(json, this.logger));
+        const endpoints = json.map(json => jsonToObject(json, this.logger));
         observer.next(endpoints);
       } catch (e) {
         observer.error(e);
