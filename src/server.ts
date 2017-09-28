@@ -3,11 +3,11 @@ import * as http from 'http';
 import * as Rx from 'rxjs';
 import * as winston from 'winston';
 
-import { EndPoint } from './endpoint';
+import { Endpoint } from './endpoint';
 import { TargetRouter } from './target-router';
 
 interface EndpointServers {
-  endpoint: EndPoint;
+  endpoint: Endpoint;
   servers: http.Server[];
 }
 
@@ -23,7 +23,7 @@ export class ServerManager {
     this.handler = this.handler.bind(this);
   }
 
-  updateEndpoints(endpoints: EndPoint[]): Rx.Observable<string> {
+  updateEndpoints(endpoints: Endpoint[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
       endpoints.forEach(endpoint => {
         if (this.endpointsConfig.has(endpoint.name)) {
@@ -40,7 +40,7 @@ export class ServerManager {
     });
   }
 
-  private shutDownEndpoint(endpoint: EndPoint, observer: Rx.Observer<string>) {
+  private shutDownEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>) {
     const servers = this.endpointsConfig.get(endpoint.name).servers;
     servers.forEach(server => {
       if (server.listening) {
@@ -53,11 +53,11 @@ export class ServerManager {
     this.endpointsConfig.delete(endpoint.name)
   }
 
-  private spinUpEndpoint(endpoint: EndPoint, observer: Rx.Observer<string>) {
+  private spinUpEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>) {
     const servers: http.Server[] = [];
     endpoint.nodes.forEach(node => {
       node.listBinds().forEach(bind => {
-        const server = http.createServer(this.handler);
+        const server = http.createServer(this.handler(endpoint));
         server.listen(bind.port, bind.ip.to_s(), (err: any) => {
           if (err) {
             observer.error(err);
@@ -70,9 +70,11 @@ export class ServerManager {
     this.endpointsConfig.set(endpoint.name, { endpoint: endpoint, servers: servers })
   }
 
-  private handler(req: http.IncomingMessage, res: http.ServerResponse) {
-    this.logger.info(`${req.method} ${req.url}`);
-    this.targetRouter.route(req, res);
-    res.end()
+  private handler(endpoint: Endpoint) {
+    return function (req: http.IncomingMessage, res: http.ServerResponse) {
+      this.logger.info(`${req.method} ${req.url}`);
+      this.targetRouter.route(req, res, endpoint);
+      res.end()
+    }
   }
 }

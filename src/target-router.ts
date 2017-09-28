@@ -6,30 +6,36 @@ import * as url from 'url';
 import * as yargs from 'yargs';
 import * as winston from 'winston';
 import IPAddress from 'ipaddress';
+import { Endpoint } from './endpoint';
+import { Route } from './router';
 
 export class TargetRouter {
   private etc: etcd.EtcdObservable;
   private targets: Target[];
+  private routes: Route[];
 
   constructor(etc: etcd.EtcdObservable) {
     this.etc = etc;
     this.targets = [];
+    this.routes = [];
   }
 
-  route(req: http.IncomingMessage, res: http.ServerResponse): void {
-    this.findTarget(req).subscribe((apply: Apply) => {
+  route(req: http.IncomingMessage, res: http.ServerResponse, endpoint: Endpoint): void {
+    this.findTarget(req, endpoint.name).subscribe((apply: Apply) => {
       apply(req, res);
     })
   }
 
-  private findTarget(req: http.IncomingMessage): Rx.Observable<Apply> {
+  private findTarget(req: http.IncomingMessage, endpointName: string): Rx.Observable<Apply> {
     return Rx.Observable.create((observer: Rx.Observer<Apply>) => {
-      this.getRoute(req, observer) || TargetRouter.internalError(observer);
+      this.getRoute(req, observer, endpointName) || TargetRouter.internalError(observer);
     });
   }
 
-  private getRoute(req: http.IncomingMessage, observer: Rx.Observer<Apply>): any {
-    const target = this.targets.find(target => target.isApplicable(req));
+  private getRoute(req: http.IncomingMessage, observer: Rx.Observer<Apply>, endpointName: string): any {
+    const route = this.routes.find(route => route.isApplicable(req, endpointName));
+    if (!route) return null;
+    const target = this.targets.find(target => target.name === eval(route.rule));
     if (!target) return null;
     observer.next((request, response) => {
       request
@@ -51,11 +57,19 @@ export class TargetRouter {
 
   updateTargets(targets: Target[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
-      console.log(this.constructor.name);
       this.targets = targets;
-      observer.next(JSON.stringify(targets))
+      observer.next(JSON.stringify(targets));
     });
   }
+
+  updateRoutes(routes: Route[]): Rx.Observable<string> {
+    return Rx.Observable.create((observer: Rx.Observer<string>) => {
+      this.routes = routes;
+      observer.next(JSON.stringify(routes));
+    });
+  }
+
+
 }
 
 interface Apply {
@@ -253,9 +267,5 @@ export class Target {
     }
     this.hosts = filtered;
     return host;
-  }
-
-  isApplicable(req: http.IncomingMessage): boolean {
-    return false;
   }
 }

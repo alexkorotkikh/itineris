@@ -1,9 +1,11 @@
+import * as http from 'http';
+
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as winston from 'winston';
 import * as yargs from 'yargs';
 
-import { EndPoint } from './endpoint';
+import { Endpoint } from './endpoint';
 import { ConfigSource } from './config-source';
 import { ServerManager } from './server';
 import { Target, TargetRouter } from './target-router';
@@ -22,7 +24,7 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger
     const serverManager = new ServerManager(logger, targetRouter);
 
     infoSource.start('endpoints').subscribe((res: any) =>
-      infoSource.onNext(res, EndPoint.loadFrom).subscribe(endpoints => {
+      infoSource.onNext(res, Endpoint.loadFrom).subscribe(endpoints => {
         serverManager.updateEndpoints(endpoints).subscribe(result => {
           logger.info('endpoints configuration updated', result)
         }, observer.error);
@@ -32,6 +34,15 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger
       infoSource.onNext(res, Target.loadFrom).subscribe(targets =>
         targetRouter.updateTargets(targets).subscribe(result => {
           logger.info('targets configuration updated', result);
+        })
+      ));
+
+    infoSource.start('routes').subscribe((res: any) =>
+      infoSource.onNext(res, (json, log) => {
+        return new Route(json.name, json.endpointName, json.order, json.rule, log);
+      }).subscribe(routes =>
+        targetRouter.updateRoutes(routes).subscribe(result => {
+          logger.info('routes configuration updated', result);
         })
       ));
     observer.next('Router started');
@@ -91,7 +102,7 @@ export function cli(args: string[]): Rx.Observable<string> {
     createVersionHandler(y, observer);
     createStartHandler(y, observer, logger, etc);
 
-    EndPoint.cli(y, etc, upset, logger, observer);
+    Endpoint.cli(y, etc, upset, logger, observer);
     Target.cli(y, etc, upset, logger, observer);
     Route.cli(y, etc, upset, logger, observer);
 
@@ -99,14 +110,16 @@ export function cli(args: string[]): Rx.Observable<string> {
   });
 }
 
-class Route {
+export class Route {
   private readonly log: winston.LoggerInstance;
   public readonly name: string;
   public order: number;
   public rule: string;
+  public endpointName: string;
 
-  constructor(name: string, order: number, rule: string, log: winston.LoggerInstance) {
+  constructor(name: string, endpointName: string, order: number, rule: string, log: winston.LoggerInstance) {
     this.name = name;
+    this.endpointName = endpointName;
     this.log = log;
     this.order = order;
     this.rule = rule;
@@ -123,6 +136,10 @@ class Route {
       };
       const opRouteDetails = {
         ...opRouteName,
+        'endpointName': {
+          description: 'Endpoint to which route is applicable',
+          require: true
+        },
         'order': {
           description: 'Order of the route',
           require: true
@@ -140,7 +157,7 @@ class Route {
                 if (routeJson) {
                   obs.error('route already exists');
                 } else {
-                  const route = new Route(argv.routeName, argv.order, argv.rule, log);
+                  const route = new Route(argv.routeName, argv.endpointName, argv.order, argv.rule, log);
                   out.next(route.toObject());
                 }
               } catch (e) {
@@ -159,7 +176,7 @@ class Route {
               } else {
                 const routes = resp.node.nodes.map(n => {
                   const value = JSON.parse(n.value);
-                  return new Route(value.name, value.order, value.rule, log).toObject()
+                  return new Route(value.name, value.endpointName, value.order, value.rule, log).toObject()
                 });
                 obs.next(JSON.stringify(routes));
               }
@@ -185,7 +202,7 @@ class Route {
                 obs.error(JSON.stringify(resp.err));
               } else {
                 const value = JSON.parse(resp.node.value);
-                const route = new Route(value.name, value.order, value.rule, log).toObject();
+                const route = new Route(value.name, value.endpointName, value.order, value.rule, log).toObject();
                 obs.next(JSON.stringify(route));
               }
             } catch (e) {
@@ -199,8 +216,13 @@ class Route {
   toObject() {
     return {
       name: this.name,
+      endpointName: this.endpointName,
       order: this.order,
       rule: this.rule,
     }
+  }
+
+  isApplicable(req: http.IncomingMessage, endpointName: string): boolean {
+    return this.endpointName === endpointName;
   }
 }

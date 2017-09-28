@@ -5,7 +5,7 @@ import * as Rx from 'rxjs';
 import * as Uuid from 'uuid';
 
 import * as router from '../src/router';
-import { EndPoint, IpPort } from '../src/endpoint';
+import { Endpoint, IpPort } from '../src/endpoint';
 import * as winston from 'winston';
 import { IPAddress } from 'ipaddress';
 import request = require('request');
@@ -133,12 +133,12 @@ describe('router', function (): void {
       return router.cli(['start']);
     }
 
-    function addNewEndpoint(num: number): Rx.Observable<EndPoint> {
+    function addNewEndpoint(num: number): Rx.Observable<Endpoint> {
       const endpointName = 'testEndpoint' + num;
       const nodeName = 'testNode' + num;
       const ip = '127.0.0.' + num;
       const port = '808' + (num - 1);
-      return Rx.Observable.create((observer: Rx.Observer<EndPoint>) => {
+      return Rx.Observable.create((observer: Rx.Observer<Endpoint>) => {
         routerCli([
           'endpoint', 'add',
           '--endpointName', endpointName,
@@ -155,7 +155,7 @@ describe('router', function (): void {
               '--ip', ip,
               '--port', port
             ]).subscribe(() => {
-              const endPoint = new EndPoint(endpointName, log);
+              const endPoint = new Endpoint(endpointName, log);
               const node = endPoint.addNode(nodeName);
               node.addBind(new IpPort(IPAddress.parse(ip), parseInt(port), log));
               observer.next(endPoint)
@@ -165,7 +165,7 @@ describe('router', function (): void {
       });
     }
 
-    function checkIsAccessible(endPoint: EndPoint): Rx.Observable<void> {
+    function checkIsAccessible(endPoint: Endpoint): Rx.Observable<void> {
       return Rx.Observable.create((observer: Rx.Observer<void>) => {
         function ping(attempts: number) {
           const ipPort = endPoint.listNodes()[0].listBinds()[0];
@@ -190,8 +190,8 @@ describe('router', function (): void {
       });
     }
 
-    function checkAddEndpoints(count: number): Rx.Observable<EndPoint[]> {
-      return Rx.Observable.create((observer: Rx.Observer<EndPoint[]>) => {
+    function checkAddEndpoints(count: number): Rx.Observable<Endpoint[]> {
+      return Rx.Observable.create((observer: Rx.Observer<Endpoint[]>) => {
         addNewEndpoint(count).subscribe(endPoint => {
           checkIsAccessible(endPoint).subscribe(() => {
             if (count - 1 > 0) {
@@ -206,9 +206,9 @@ describe('router', function (): void {
 
     function checkRemoveEndpoints(count: number) {
       routerCli(['endpoint', 'list', '--json']).subscribe((strList) => {
-        const list = JSON.parse(strList).map((e: any) => EndPoint.loadFrom(e, log));
+        const list = JSON.parse(strList).map((e: any) => Endpoint.loadFrom(e, log));
         assert.equal(list.length, 1);
-        list.forEach((endPoint: EndPoint) => {
+        list.forEach((endPoint: Endpoint) => {
           routerCli(['endpoint', 'remove', '--endpointName', endPoint.name]).subscribe(() => {
             const ipPort = endPoint.nodes[0].listBinds()[0];
             const req = request.get({
