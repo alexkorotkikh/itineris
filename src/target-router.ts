@@ -6,7 +6,7 @@ import * as url from 'url';
 import * as yargs from 'yargs';
 import * as winston from 'winston';
 import IPAddress from 'ipaddress';
-import { Endpoint } from './endpoint';
+import { Endpoint, IpPort } from './endpoint';
 import { Route } from './router';
 
 export class TargetRouter {
@@ -38,13 +38,11 @@ export class TargetRouter {
     const target = this.targets.find(target => target.name === eval(route.rule));
     if (!target) return null;
     observer.next((request, response) => {
-      request
-        .pipe(rq({
-          qs: url.parse(request.url).query,
-          uri: target.hosts[Math.floor(Math.random() * target.hosts.length)].to_s(),
-        }))
-        .pipe(response);
+      const targetHost = target.hosts[Math.floor(Math.random() * target.hosts.length)];
+      const url = 'http://' + targetHost.toString() + request.url;
+      request.pipe(rq(url)).pipe(response);
     });
+    return url;
   }
 
   private static internalError(observer: Rx.Observer<Apply>) {
@@ -58,18 +56,16 @@ export class TargetRouter {
   updateTargets(targets: Target[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
       this.targets = targets;
-      observer.next(JSON.stringify(targets));
+      observer.next(JSON.stringify(targets.map(t => t.toObject())));
     });
   }
 
   updateRoutes(routes: Route[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
       this.routes = routes;
-      observer.next(JSON.stringify(routes));
+      observer.next(JSON.stringify(routes.map(r => r.toObject())));
     });
   }
-
-
 }
 
 interface Apply {
@@ -79,7 +75,7 @@ interface Apply {
 export class Target {
   private readonly log: winston.LoggerInstance;
   public readonly name: string;
-  public hosts: IPAddress[];
+  public hosts: IpPort[];
   public metadata: any;
 
   constructor(targetName: string, log: winston.LoggerInstance) {
@@ -87,7 +83,6 @@ export class Target {
     this.log = log;
     this.hosts = [];
   }
-
 
   static cli(y: yargs.Argv, etc: etcd.EtcdObservable, upset: etcd.Upset,
              log: winston.LoggerInstance, obs: Rx.Observer<string>) {
@@ -177,22 +172,24 @@ export class Target {
           const hosts = yargs.usage('$0 service hosts <cmd> [args]');
           const opHost = {
             ...opTargetName,
-            'host': {
-              description: 'new host tp add',
-              required: true,
-            }
+            'ip': {
+              description: 'IP address of the target',
+              required: true
+            },
+            'port': {
+              description: 'Port of the target',
+              required: true
+            },
           };
           hosts.command('add', 'add host', opHost, (argv) => {
-            let host: IPAddress;
-            try {
-              host = IPAddress.parse(argv.host);
-            } catch (e) {
-              obs.error(e);
+            const host = IpPort.loadFrom({ ip: argv.ip, port: argv.port }, log);
+            if (!host) {
+              obs.error(new Error('ip and/or port not valid'));
               return;
             }
             upset.upSet(`targets/${argv.targetName}`, (targetJson: any, out: Rx.Subject<any>) => {
               const target = Target.loadFrom(targetJson, log);
-              if (target.hosts.find((h: any) => h.eq(host))) {
+              if (target.hosts.find((h: IpPort) => h.equals(host))) {
                 obs.error('host already added');
               } else {
                 target.addHost(host);
@@ -209,17 +206,15 @@ export class Target {
                 } else {
                   const target = Target.loadFrom(resp.value, log);
                   if (!target.hosts) target.hosts = [];
-                  const hs = target.hosts.map((h: IPAddress) => h.to_s());
+                  const hs = target.hosts.map((h: IpPort) => h.toString());
                   obs.next(JSON.stringify(hs));
                 }
               })
             })
             .command('remove', 'remove host', opHost, (argv) => {
-              let host: IPAddress;
-              try {
-                host = IPAddress.parse(argv.host);
-              } catch (e) {
-                obs.error(e);
+              const host = IpPort.loadFrom({ ip: argv.ip, port: argv.port }, log);
+              if (!host) {
+                obs.error(new Error('ip and/or port not valid'));
                 return;
               }
               upset.upSet(`targets/${argv.targetName}`, (targetJson: any, out: Rx.Subject<any>) => {
@@ -241,7 +236,7 @@ export class Target {
 
   static loadFrom(obj: any, log: winston.LoggerInstance): Target {
     const ret = new Target(obj.name, log);
-    (obj.hosts || []).forEach((host: string) => ret.addHost(IPAddress.parse(host)));
+    (obj.hosts || []).forEach((host: any) => ret.addHost(IpPort.loadFrom(host, log)));
     ret.metadata = obj.metadata || {};
     return ret;
   }
@@ -249,20 +244,20 @@ export class Target {
   toObject(): any {
     return {
       name: this.name,
-      urls: this.hosts.map(u => u.to_s()),
+      hosts: this.hosts.map(h => h && h.toObject()),
       metadata: this.metadata,
     };
   }
 
-  addHost(host: IPAddress): IPAddress {
+  addHost(host: IpPort): IpPort {
     this.hosts.push(host);
     return host;
   }
 
-  removeHost(host: IPAddress): IPAddress {
-    const filtered = this.hosts.filter(h => h.eq(host));
-    if (!filtered || filtered.length === this.hosts.length) {
-      this.log.error('host does mot exist');
+  removeHost(host: IpPort): IpPort {
+    const filtered = this.hosts.filter(h => !h.equals(host));
+    if (filtered.length === this.hosts.length) {
+      this.log.error('host does not exist');
       return null;
     }
     this.hosts = filtered;

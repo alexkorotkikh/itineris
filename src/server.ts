@@ -20,7 +20,7 @@ export class ServerManager {
     this.logger = logger;
     this.endpointsConfig = new Map;
     this.targetRouter = targetRouter;
-    this.handler = this.handler.bind(this);
+    // this.handler = this.handler.bind(this);
   }
 
   updateEndpoints(endpoints: Endpoint[]): Rx.Observable<string> {
@@ -57,7 +57,10 @@ export class ServerManager {
     const servers: http.Server[] = [];
     endpoint.nodes.forEach(node => {
       node.listBinds().forEach(bind => {
-        const server = http.createServer(this.handler(endpoint));
+        const server = http.createServer((req, res) => {
+          this.logger.info(`${req.method} ${req.url}`);
+          this.targetRouter.route(req, res, endpoint);
+        });
         server.listen(bind.port, bind.ip.to_s(), (err: any) => {
           if (err) {
             observer.error(err);
@@ -68,13 +71,5 @@ export class ServerManager {
       });
     });
     this.endpointsConfig.set(endpoint.name, { endpoint: endpoint, servers: servers })
-  }
-
-  private handler(endpoint: Endpoint) {
-    return function (req: http.IncomingMessage, res: http.ServerResponse) {
-      this.logger.info(`${req.method} ${req.url}`);
-      this.targetRouter.route(req, res, endpoint);
-      res.end()
-    }
   }
 }

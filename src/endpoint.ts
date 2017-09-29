@@ -36,6 +36,10 @@ export class IpPort {
   toObject(): any {
     return { ip: this.ip.to_s(), port: this.port }
   }
+
+  toString(): string {
+    return `${this.ip.to_s()}:${this.port}`
+  }
 }
 
 export class Node {
