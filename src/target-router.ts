@@ -35,7 +35,9 @@ export class TargetRouter {
   private getRoute(req: http.IncomingMessage, observer: Rx.Observer<Apply>, endpointName: string): any {
     const route = this.routes.find(route => route.isApplicable(req, endpointName));
     if (!route) return null;
-    const target = this.targets.find(target => target.name === eval(route.rule));
+    const targetNameFunc = new Function('req', route.rule);
+    const targetName = targetNameFunc(req);
+    const target = this.targets.find(target => target.name === targetName);
     if (!target) return null;
     observer.next((request, response) => {
       const targetHost = target.hosts[Math.floor(Math.random() * target.hosts.length)];
