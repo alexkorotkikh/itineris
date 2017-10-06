@@ -173,15 +173,15 @@ describe('router', function (): void {
             uri: `http://${ipPort.toString()}/`,
             resolveWithFullResponse: true,
           }).then(response => {
-            assert.equal(response.statusCode, 200);
-            observer.next(null);
-          }).catch(err => {
             if (attempts > 0) {
               ping(attempts - 1);
+            } else {
+              assert.fail(response);
             }
-            else {
-              assert.fail(err);
-            }
+          }).catch(err => {
+            // rq treats HTTP 500 as exception
+            assert.equal(err.statusCode, 500);
+            observer.next(null);
           });
         }
 
@@ -219,7 +219,6 @@ describe('router', function (): void {
               }).on('complete', (resp) => {
                 observer.next(null);
               })
-
             });
           });
         })
