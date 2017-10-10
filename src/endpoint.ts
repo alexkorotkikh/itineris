@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as rx from 'rxjs';
 import * as winston from 'winston';
 import * as yargs from 'yargs';
@@ -286,13 +287,14 @@ export class Endpoint {
           });
         })
         .command('set', 'options to a endpoint', {
+          ...opEndpointName,
           'tls-cert': {
             description: 'Path to TLS certificate file',
             required: true
           },
           'tls-chain': {
             description: 'Path to TLS chain file',
-            required: true
+            required: false
           },
           'tls-key': {
             description: 'Path to TLS key file',
@@ -300,14 +302,20 @@ export class Endpoint {
           }
         }, (argv) => {
           upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
-            const endpoint = Endpoint.loadFrom(endpointJson, log);
-            endpoint.tls.tlsKey = argv.tlsKey || endpoint.tls.tlsKey;
-            endpoint.tls.tlsCert = argv.tlsCert || endpoint.tls.tlsCert;
-            endpoint.tls.tlsChain = argv.tlsChain || endpoint.tls.tlsChain;
-            out.next(endpoint.toObject());
+            try {
+              const endpoint = Endpoint.loadFrom(endpointJson, log);
+              const get = (val: string) => (val && fs.readFileSync(val, 'utf8'));
+              endpoint.tls.tlsKey = get(argv.tlsKey) || endpoint.tls.tlsKey;
+              endpoint.tls.tlsCert = get(argv.tlsCert) || endpoint.tls.tlsCert;
+              endpoint.tls.tlsChain = get(argv.tlsChain) || endpoint.tls.tlsChain;
+              out.next(endpoint.toObject());
+            } catch (e) {
+              obs.error(e);
+            }
+
           }).subscribe(() => {
             obs.next('endpoint options were set');
-          });
+          }, console.error);
         })
         .command('unset', 'remove options from a endpoint', {}, (argv) => {
           upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {

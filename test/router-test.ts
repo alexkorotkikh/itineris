@@ -39,14 +39,7 @@ describe('router', function (): void {
     });
   });
 
-  it('connects to etcd', (done) => {
-    router.cli(['start']).subscribe((start) => {
-      assert.equal(start, 'Router started');
-      done();
-    });
-  });
-
-  it.only('reacts on adding and removing endpoints', function (done) {
+  it('reacts on adding and removing endpoints', function (done) {
     this.timeout(5000);
 
     let uuid = Uuid.v4().toString();
