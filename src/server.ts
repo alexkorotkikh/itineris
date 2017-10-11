@@ -37,7 +37,6 @@ export class ServerManager {
           this.spinUpEndpoint(endpoint, observer);
         }
       });
-      observer.next('OK');
     });
   }
 

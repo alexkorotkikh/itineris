@@ -19,7 +19,6 @@ export class ConfigSource {
   onNext<T>(res: any, jsonToObject: (json: any, logger: winston.LoggerInstance) => T): Rx.Observable<T[]> {
     return Rx.Observable.create((observer: Rx.Observer<T[]>) => {
       try {
-        this.logger.info(JSON.stringify(res));
         let json: any[];
         if (res.node.dir) {
           json = res.node.nodes.map((n: any) => JSON.parse(n.value))
