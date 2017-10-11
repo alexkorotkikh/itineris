@@ -304,7 +304,7 @@ export class Endpoint {
           upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: rx.Subject<any>) => {
             try {
               const endpoint = Endpoint.loadFrom(endpointJson, log);
-              const get = (val: string) => (val && fs.readFileSync(val, 'utf8'));
+              const get = (val: fs.PathLike) => val && fs.readFileSync(val, 'utf8');
               endpoint.tls.tlsKey = get(argv.tlsKey) || endpoint.tls.tlsKey;
               endpoint.tls.tlsCert = get(argv.tlsCert) || endpoint.tls.tlsCert;
               endpoint.tls.tlsChain = get(argv.tlsChain) || endpoint.tls.tlsChain;
@@ -312,7 +312,6 @@ export class Endpoint {
             } catch (e) {
               obs.error(e);
             }
-
           }).subscribe(() => {
             obs.next('endpoint options were set');
           }, console.error);

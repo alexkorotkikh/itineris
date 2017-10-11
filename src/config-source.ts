@@ -29,9 +29,10 @@ export class ConfigSource {
         } else {
           json = [JSON.parse(res.node.value)];
         }
-        const endpoints = json.map(json => jsonToObject(json, this.logger));
-        observer.next(endpoints);
+        const objects = json.map(json => jsonToObject(json, this.logger));
+        observer.next(objects);
       } catch (e) {
+        console.log(e);
         observer.error(e);
       }
     });

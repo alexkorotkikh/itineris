@@ -63,9 +63,7 @@ export class ServerManager {
           this.targetRouter.route(req, res, endpoint);
         };
         try {
-
           const tlsConfig = this.createTlsConfig(endpoint);
-          console.log(tlsConfig.cert);
           const server = tlsConfig ?
             https.createServer(tlsConfig, handler) :
             http.createServer(handler);
