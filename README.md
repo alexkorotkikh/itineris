@@ -1,4 +1,9 @@
 # Version Router
+# Prerequisites
+```bash
+npm install -g ts-node
+npm install -g typescript
+```
 ## Endpoints
 Endpoints are NodeJS server instances, bind to IP and port according to its configuration
 ```bash
@@ -18,6 +23,10 @@ ts-node src/router-ctl.ts target hosts add --targetName test-target --host local
 ts-node src/router-ctl.ts route add --routeName test-route --endpointName test --order 1 --rule "
     return 'test-target';
 "
+```
+To start router:
+```bash
+ts-node src/router-ctl.ts start
 ```
 ### Router rule
 Router rule is a javascript snippet that looks like a body of function with one argument `req` of type `http.IncomingMessage`
