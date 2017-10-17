@@ -74,20 +74,20 @@ describe('router', function (): void {
               '--ip', ip,
               '--port', port
             ]).subscribe(() => {
-              const endPoint = new Endpoint(endpointName, log);
-              const node = endPoint.addNode(nodeName);
+              const endpoint = new Endpoint(endpointName, log);
+              const node = endpoint.addNode(nodeName);
               node.addBind(new IpPort(IPAddress.parse(ip), parseInt(port), log));
-              observer.next(endPoint)
+              observer.next(endpoint)
             })
           })
         });
       });
     }
 
-    function checkIsAccessible(endPoint: Endpoint): Rx.Observable<void> {
+    function checkIsAccessible(endpoint: Endpoint): Rx.Observable<void> {
       return Rx.Observable.create((observer: Rx.Observer<void>) => {
         function ping(attempts: number) {
-          const ipPort = endPoint.listNodes()[0].listBinds()[0];
+          const ipPort = endpoint.listNodes()[0].listBinds()[0];
           rq.get({
             uri: `http://${ipPort.toString()}/`,
             resolveWithFullResponse: true,
@@ -110,8 +110,8 @@ describe('router', function (): void {
 
     function checkAddEndpoints(count: number): Rx.Observable<Endpoint[]> {
       return Rx.Observable.create((observer: Rx.Observer<Endpoint[]>) => {
-        addNewEndpoint(count).subscribe(endPoint => {
-          checkIsAccessible(endPoint).subscribe(() => {
+        addNewEndpoint(count).subscribe(endpoint => {
+          checkIsAccessible(endpoint).subscribe(() => {
             if (count - 1 > 0) {
               checkAddEndpoints(count - 1).subscribe(() => observer.next(null));
             } else {
@@ -127,9 +127,9 @@ describe('router', function (): void {
         routerCli(['endpoint', 'list', '--json']).subscribe((strList) => {
           const list = JSON.parse(strList).map((e: any) => Endpoint.loadFrom(e, log));
           assert.equal(list.length, count);
-          list.forEach((endPoint: Endpoint) => {
-            routerCli(['endpoint', 'remove', '--endpointName', endPoint.name]).subscribe(() => {
-              const ipPort = endPoint.nodes[0].listBinds()[0];
+          list.forEach((endpoint: Endpoint) => {
+            routerCli(['endpoint', 'remove', '--endpointName', endpoint.name]).subscribe(() => {
+              const ipPort = endpoint.nodes[0].listBinds()[0];
               request.get({
                 uri: `http://${ipPort.toString()}/`,
                 timeout: 100,
@@ -144,7 +144,7 @@ describe('router', function (): void {
       });
     }
 
-    let count: number = 10;
+    let count = 10;
     startRouter().subscribe(() => {
       checkAddEndpoints(count).subscribe(() => {
         checkRemoveEndpoints(count).subscribe(() => {

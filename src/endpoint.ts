@@ -251,8 +251,8 @@ export class Endpoint {
                 if (endpointJson) {
                   obs.error('endpoint already exists');
                 } else {
-                  const endPoint = new Endpoint(argv.endpointName, log);
-                  out.next(endPoint.toObject());
+                  const endpoint = new Endpoint(argv.endpointName, log);
+                  out.next(endpoint.toObject());
                 }
               } catch (e) {
                 obs.error(e)
@@ -268,8 +268,8 @@ export class Endpoint {
               if (resp.isErr()) {
                 obs.error(JSON.stringify(resp.err));
               } else {
-                const endPoints = resp.node.nodes.map(n => Endpoint.loadFrom(JSON.parse(n.value), log).toObject());
-                obs.next(JSON.stringify(endPoints));
+                const endpoints = resp.node.nodes.map(n => Endpoint.loadFrom(JSON.parse(n.value), log).toObject());
+                obs.next(JSON.stringify(endpoints));
               }
             } catch (e) {
               obs.error(e);
