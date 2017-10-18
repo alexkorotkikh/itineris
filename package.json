@@ -1,35 +1,19 @@
 {
-  "name": "router",
+  "name": "itineris",
   "version": "0.1.0",
   "description": "",
-  "main": "dist/collector.js",
+  "main": "dist/src/router-ctl.js",
   "engines": {
     "node": ">=6.9.5"
   },
-  "scripts": {
-    "clean": "rimraf dist",
-    "prebuild": "npm run clean",
-    "build": "tsc",
-    "build:watch": "tsc-watch server.ts --outDir ./dist --onSuccess 'node ./dist/server.ts'",
-    "start": "nodemon ./dist/collector.js",
-    "pretest": "npm run build",
-    "lint": "tslint --project .",
-    "test": "mocha --require dist/test/etcd-daemon.js dist/test/*-test.js",
-    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -w",
-    "preversion": "npm test",
-    "version": "npm run build && conventional-changelog -p angular -v -r 0 > CHANGELOG.md && git add -A .",
-    "postversion": "git push && git push --tags",
-    "prepublish": "not-in-install && npm run build || echo 'In install cycle, skipping prepublish'"
-  },
   "repository": {
     "type": "git",
-    "url": "mabels/sla-clock"
+    "url": "alexkorotkikh/itineris"
   },
   "license": "AFL-2.0",
   "bugs": {
-    "url": "https://github.com/mabels/sla-clock/issues"
+    "url": "https://github.com/alexkorotkikh/itineris/issues"
   },
-  "homepage": "https://github.com/mabels/sla-clock#readme",
   "devDependencies": {
     "@types/chai": "^4.0.3",
     "@types/mocha": ">=2.2.33",
