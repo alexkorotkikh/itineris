@@ -8,9 +8,12 @@ import { Endpoint } from './endpoint';
 import { TargetRouter } from './target-router';
 import * as net from "net";
 
+type Server = http.Server | https.Server;
+
 interface EndpointServers {
+
   endpoint: Endpoint;
-  servers: net.Server[];
+  servers: Server[];
 }
 
 export class ServerManager {
@@ -42,7 +45,7 @@ export class ServerManager {
 
   private shutDownEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>) {
     const servers = this.endpointsConfig.get(endpoint.name).servers;
-    servers.forEach(server => {
+    servers.forEach((server: http.Server | https.Server) => {
       if (server.listening) {
         const address = server.address();
         server.close(() => {
@@ -54,7 +57,7 @@ export class ServerManager {
   }
 
   private spinUpEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>) {
-    const servers: net.Server[] = [];
+    const servers: Server[] = [];
     endpoint.nodes.forEach(node => {
       node.listBinds().forEach(bind => {
         const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -86,7 +89,7 @@ export class ServerManager {
     return endpoint.tls && endpoint.tls.tlsKey && endpoint.tls.tlsCert && {
       key: endpoint.tls.tlsKey,
       cert: endpoint.tls.tlsCert,
-      // ca: endpoint.tls.tlsChain,
+      ca: endpoint.tls.tlsChain,
     }
   }
 }

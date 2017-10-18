@@ -136,7 +136,7 @@ describe('router', function (): void {
               }).on('error', (err) => {
                 console.log(err);
               }).on('complete', (resp) => {
-                observer.next(null);
+                checkRemoveEndpoints(count - 1).subscribe(() => observer.next(null));
               })
             });
           });
