@@ -63,7 +63,7 @@ export class Node {
       }, opNodeName);
       const node = yargs.usage('$0 service node <cmd> [args]');
       node.command('add', 'add ipport by name', opIpPort, (argv) => {
-        upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: Rx.Subject<any>) => {
+        upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
           const endpoint = Endpoint.loadFrom(endpointJson, log);
           const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
           if (!node) {
@@ -103,7 +103,7 @@ export class Node {
         });
       });
       node.command('remove', 'remove ipport by name', opIpPort, (argv) => {
-        upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: Rx.Subject<any>) => {
+        upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
           try {
             const endpoint = Endpoint.loadFrom(endpointJson, log);
             const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
@@ -246,7 +246,7 @@ export class Endpoint {
       const endpoints = yargs.usage('$0 endpoint <cmd> [args]')
         .command('add', 'adds a endpoint', opEndpointName, (argv) => {
           etc.mkdir('endpoints').subscribe(() => {
-            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: Rx.Subject<any>) => {
+            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
               try {
                 if (endpointJson) {
                   obs.error('endpoint already exists');
@@ -268,6 +268,7 @@ export class Endpoint {
               if (resp.isErr()) {
                 obs.error(JSON.stringify(resp.err));
               } else {
+                console.log(JSON.stringify(resp.node.nodes));
                 const endpoints = resp.node.nodes.map(n => Endpoint.loadFrom(JSON.parse(n.value), log).toObject());
                 obs.next(JSON.stringify(endpoints));
               }
@@ -301,7 +302,7 @@ export class Endpoint {
             required: true
           }
         }, (argv) => {
-          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: Rx.Subject<any>) => {
+          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
             try {
               const endpoint = Endpoint.loadFrom(endpointJson, log);
               const get = (val: fs.PathLike) => val && fs.readFileSync(val, 'utf8');
@@ -316,8 +317,8 @@ export class Endpoint {
             obs.next('endpoint options were set');
           }, console.error);
         })
-        .command('unset', 'remove options from a endpoint', {}, (argv) => {
-          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: Rx.Subject<any>) => {
+        .command('unset', 'remove options from a endpoint', opEndpointName, (argv) => {
+          upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
             const endpoint = Endpoint.loadFrom(endpointJson, log);
             endpoint.tls.tlsKey = null;
             endpoint.tls.tlsCert = null;
@@ -325,12 +326,12 @@ export class Endpoint {
             out.next(endpoint.toObject());
           }).subscribe(() => {
             obs.next('endpoint options were unset');
-          });
+          }, console.error);
         })
         .command('nodes', 'handle nodes', (): yargs.Argv => {
           const nodes = yargs.usage('$0 service nodes <cmd> [args]');
           nodes.command('add', 'add node by name', opNodeName, (argv) => {
-            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: Rx.Subject<any>) => {
+            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
               const endpoint = Endpoint.loadFrom(endpointJson, log);
               if (endpoint.nodes.find((n: any) => n.name === argv.nodeName)) {
                 obs.error('node already exist');
@@ -355,7 +356,7 @@ export class Endpoint {
             })
           });
           nodes.command('remove', 'add node by name', opNodeName, (argv) => {
-            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson: any, out: Rx.Subject<any>) => {
+            upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
               const endpoint = Endpoint.loadFrom(endpointJson, log);
               const node = endpoint.removeNode(argv.nodeName);
               if (!node) {

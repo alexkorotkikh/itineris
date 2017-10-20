@@ -5,7 +5,6 @@ import * as rq from 'request';
 import * as url from 'url';
 import * as yargs from 'yargs';
 import * as winston from 'winston';
-import IPAddress from 'ipaddress';
 import { Endpoint, IpPort } from './endpoint';
 import { Route } from './router';
 
