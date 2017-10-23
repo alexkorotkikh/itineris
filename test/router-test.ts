@@ -133,7 +133,8 @@ describe('router', function (): void {
               }).on('error', (err) => {
                 console.log(err);
               }).on('complete', (resp) => {
-              checkRemoveEndpoints(count - 1).subscribe(() => observer.next(null));
+                if (count === 1) done();
+                else checkRemoveEndpoints(count - 1).subscribe(() => observer.next(null));
               })
             });
           });
@@ -144,9 +145,8 @@ describe('router', function (): void {
     let count = 10;
     startRouter().subscribe(() => {
       checkAddEndpoints(count).subscribe(() => {
-        checkRemoveEndpoints(count).subscribe(() =>  {
-          if (count === 1) done();
-          else count--;
+        checkRemoveEndpoints(count).subscribe(() => {
+          // else count--;
         });
       });
     });

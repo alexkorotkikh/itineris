@@ -51,6 +51,16 @@ describe('endpoint cli', function () {
     ]);
   }
 
+  function addBindToNode(endpointName: string, nodeName: string) {
+    return routerCli([
+      'endpoint', 'node', 'add',
+      '--endpointName', endpointName,
+      '--nodeName', nodeName,
+      '--ip', '123.123.123.123',
+      '--port', '12345'
+    ]);
+  }
+
   function listNodesForEndpoint(endpointName: string): Rx.Observable<Node[]> {
     return Rx.Observable.create((observer: Rx.Observer<Node[]>) => {
       listEndpoints().subscribe((list) => {
@@ -178,13 +188,7 @@ describe('endpoint cli', function () {
     const nodeName = 'test-node';
     createEndpoint(endpointName).subscribe(() => {
       createNode(endpointName, nodeName).subscribe(() => {
-        routerCli([
-          'endpoint', 'node', 'add',
-          '--endpointName', endpointName,
-          '--nodeName', nodeName,
-          '--ip', '123.123.123.123',
-          '--port', '12345'
-        ]).subscribe((str) => {
+        addBindToNode(endpointName, nodeName).subscribe((str) => {
           assert.equal(str, 'bind added to node');
           listNodesForEndpoint(endpointName).subscribe((nodes) => {
             const node = nodes.find(n => n.name === nodeName);
@@ -193,6 +197,32 @@ describe('endpoint cli', function () {
             assert.equal(node.listBinds()[0].ip.to_s(), '123.123.123.123');
             assert.equal(node.listBinds()[0].port, 12345);
             done();
+          });
+        });
+      });
+    });
+  });
+
+  it("removes binding from node", function (done) {
+    const endpointName = 'test-nodes-remove-binding';
+    const nodeName = 'test-node';
+    createEndpoint(endpointName).subscribe(() => {
+      createNode(endpointName, nodeName).subscribe(() => {
+        addBindToNode(endpointName, nodeName).subscribe((str) => {
+          routerCli([
+            'endpoint', 'node', 'remove',
+            '--endpointName', endpointName,
+            '--nodeName', nodeName,
+            '--ip', '123.123.123.123',
+            '--port', '12345'
+          ]).subscribe((str) => {
+            assert.equal(str, 'bind was removed');
+            listNodesForEndpoint(endpointName).subscribe((nodes) => {
+              const node = nodes.find(n => n.name === nodeName);
+              assert.isDefined(node);
+              assert.equal(node.listBinds().length, 0);
+              done();
+            });
           });
         });
       });
