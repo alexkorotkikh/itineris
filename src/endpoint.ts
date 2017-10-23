@@ -268,7 +268,6 @@ export class Endpoint {
               if (resp.isErr()) {
                 obs.error(JSON.stringify(resp.err));
               } else {
-                console.log(JSON.stringify(resp.node.nodes));
                 const endpoints = resp.node.nodes.map(n => Endpoint.loadFrom(JSON.parse(n.value), log).toObject());
                 obs.next(JSON.stringify(endpoints));
               }
