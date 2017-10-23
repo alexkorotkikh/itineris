@@ -4,7 +4,7 @@ import * as Uuid from 'uuid';
 
 import * as router from '../src/router';
 import { assert } from "chai";
-import { Endpoint } from "../src/endpoint";
+import { Endpoint, Node } from "../src/endpoint";
 import * as winston from "winston";
 
 describe('endpoint cli', function () {
@@ -39,8 +39,25 @@ describe('endpoint cli', function () {
         const objs = JSON.parse(str);
         const endpoints = objs.map((obj: any) => Endpoint.loadFrom(obj, log));
         observer.next(endpoints);
-      })
-    })
+      });
+    });
+  }
+
+  function createNode(endpointName: string, nodeName: string) {
+    return routerCli([
+      'endpoint', 'nodes', 'add',
+      '--endpointName', endpointName,
+      '--nodeName', nodeName
+    ]);
+  }
+
+  function listNodesForEndpoint(endpointName: string): Rx.Observable<Node[]> {
+    return Rx.Observable.create((observer: Rx.Observer<Node[]>) => {
+      listEndpoints().subscribe((list) => {
+        const endpoint = list.find(e => e.name === endpointName);
+        observer.next(endpoint.nodes)
+      });
+    });
   }
 
   it("adds endpoint", function (done) {
@@ -50,8 +67,8 @@ describe('endpoint cli', function () {
         assert.equal(list.length, 1);
         assert.equal(list[0].name, 'test-add-endpoint');
         done();
-      })
-    })
+      });
+    });
   });
 
   it("removes endpoint", function (done) {
@@ -87,7 +104,7 @@ describe('endpoint cli', function () {
           assert.equal(endpoint.tls.tlsKey, 'test');
           done();
         });
-      })
+      });
     });
   });
 
@@ -114,7 +131,71 @@ describe('endpoint cli', function () {
             done();
           });
         });
-      })
+      });
+    });
+  });
+
+  it("adds node to endpoint", function (done) {
+    const endpointName = 'test-nodes-add-endpoint';
+    const nodeName = 'test-node';
+    createEndpoint(endpointName).subscribe(() => {
+      createNode(endpointName, nodeName).subscribe((str) => {
+        assert.equal(str, 'node was added to endpoint');
+        listNodesForEndpoint(endpointName).subscribe((nodes) => {
+          const node = nodes.find(n => n.name === nodeName);
+          assert.isDefined(node);
+          done();
+        });
+      });
+    });
+  });
+
+  it("removes node from endpoint", function (done) {
+    const endpointName = 'test-nodes-remove-endpoint';
+    const nodeName = 'test-node';
+    createEndpoint(endpointName).subscribe(() => {
+      createNode(endpointName, nodeName).subscribe(() => {
+        listNodesForEndpoint(endpointName).subscribe((list) => {
+          assert.equal(list.length, 1);
+          routerCli([
+            'endpoint', 'nodes', 'remove',
+            '--endpointName', endpointName,
+            '--nodeName', nodeName
+          ]).subscribe((str) => {
+            assert.equal(str, 'node was removed from endpoint');
+            listNodesForEndpoint(endpointName).subscribe((list) => {
+              assert.equal(list.length, 0);
+              done();
+            });
+          })
+        });
+      });
+    });
+  });
+
+  it("adds binding to node", function (done) {
+    const endpointName = 'test-nodes-add-binding';
+    const nodeName = 'test-node';
+    createEndpoint(endpointName).subscribe(() => {
+      createNode(endpointName, nodeName).subscribe(() => {
+        routerCli([
+          'endpoint', 'node', 'add',
+          '--endpointName', endpointName,
+          '--nodeName', nodeName,
+          '--ip', '123.123.123.123',
+          '--port', '12345'
+        ]).subscribe((str) => {
+          assert.equal(str, 'bind added to node');
+          listNodesForEndpoint(endpointName).subscribe((nodes) => {
+            const node = nodes.find(n => n.name === nodeName);
+            assert.isDefined(node);
+            assert.equal(node.listBinds().length, 1);
+            assert.equal(node.listBinds()[0].ip.to_s(), '123.123.123.123');
+            assert.equal(node.listBinds()[0].port, 12345);
+            done();
+          });
+        });
+      });
     });
   });
 
