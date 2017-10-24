@@ -3,11 +3,11 @@ import * as Rx from 'rxjs';
 import * as Uuid from 'uuid';
 
 import * as router from '../src/router';
-import { assert } from "chai";
-import { Endpoint, Node } from "../src/endpoint";
-import * as winston from "winston";
+import { assert } from 'chai';
+import { Endpoint, Node } from '../src/endpoint';
+import * as winston from 'winston';
 
-describe('endpoint cli', function () {
+describe('endpoint cli', () => {
   const log: winston.LoggerInstance = new (winston.Logger)({
     transports: [new (winston.transports.Console)()]
   });
@@ -19,7 +19,7 @@ describe('endpoint cli', function () {
     ]);
     let etc = etcd.EtcdPromise.create(wc);
     await etc.connect();
-    console.log("Etcd loaded");
+    console.log('Etcd loaded');
     return Promise.resolve('done');
   });
 
@@ -30,12 +30,12 @@ describe('endpoint cli', function () {
   }
 
   function createEndpoint(name: string): Rx.Observable<string> {
-    return routerCli(["endpoint", "add", "--endpointName", name]);
+    return routerCli(['endpoint', 'add', '--endpointName', name]);
   }
 
   function listEndpoints(): Rx.Observable<Endpoint[]> {
     return Rx.Observable.create((observer: Rx.Observer<Endpoint[]>) => {
-      routerCli(["endpoint", "list"]).subscribe((str) => {
+      routerCli(['endpoint', 'list']).subscribe((str) => {
         const objs = JSON.parse(str);
         const endpoints = objs.map((obj: any) => Endpoint.loadFrom(obj, log));
         observer.next(endpoints);
@@ -43,21 +43,21 @@ describe('endpoint cli', function () {
     });
   }
 
-  function createNode(endpointName: string, nodeName: string) {
+  function createNode(endpointName: string, nodeName: string): Rx.Observable<string> {
     return routerCli([
       'endpoint', 'nodes', 'add',
       '--endpointName', endpointName,
-      '--nodeName', nodeName
+      '--nodeName', nodeName,
     ]);
   }
 
-  function addBindToNode(endpointName: string, nodeName: string) {
+  function addBindToNode(endpointName: string, nodeName: string): Rx.Observable<string> {
     return routerCli([
       'endpoint', 'node', 'add',
       '--endpointName', endpointName,
       '--nodeName', nodeName,
       '--ip', '123.123.123.123',
-      '--port', '12345'
+      '--port', '12345',
     ]);
   }
 
@@ -65,30 +65,46 @@ describe('endpoint cli', function () {
     return Rx.Observable.create((observer: Rx.Observer<Node[]>) => {
       listEndpoints().subscribe((list) => {
         const endpoint = list.find(e => e.name === endpointName);
-        observer.next(endpoint.nodes)
+        observer.next(endpoint.nodes);
       });
     });
   }
 
-  it("adds endpoint", function (done) {
-    createEndpoint('test-add-endpoint').subscribe((str) => {
+  it('adds endpoint', (done) => {
+    const endpointName = 'test-add-endpoint';
+    createEndpoint(endpointName).subscribe((str) => {
       assert.equal(str, 'endpoint was added');
       listEndpoints().subscribe((list) => {
         assert.equal(list.length, 1);
-        assert.equal(list[0].name, 'test-add-endpoint');
+        assert.equal(list[0].name, endpointName);
         done();
       });
     });
   });
 
-  it("removes endpoint", function (done) {
-    createEndpoint('test-remove-endpoint').subscribe(() => {
+  it('doesn\'t adds endpoint with duplicated name', (done) => {
+    const endpointName = 'test-add-new-endpoint';
+    createEndpoint(endpointName).subscribe(() => {
+      createEndpoint(endpointName).subscribe(console.error, (str) => {
+        assert.equal(str, 'endpoint already exists');
+        listEndpoints().subscribe((list) => {
+          const filtered = list.filter(e => e.name === endpointName);
+          assert.equal(filtered.length, 1);
+          done();
+        });
+      });
+    });
+  });
+
+  it('removes endpoint', (done) => {
+    const endpointName = 'test-remove-endpoint';
+    createEndpoint(endpointName).subscribe(() => {
       listEndpoints().subscribe((list) => {
         const length = list.length;
-        routerCli(['endpoint', 'remove', '--endpointName', 'test-remove-endpoint']).subscribe((str) => {
+        routerCli(['endpoint', 'remove', '--endpointName', endpointName]).subscribe((str) => {
           assert.equal(str, 'endpoint was removed');
-          listEndpoints().subscribe((list) => {
-            assert.equal(list.length, length - 1);
+          listEndpoints().subscribe((newList) => {
+            assert.equal(newList.length, length - 1);
             done();
           });
         });
@@ -96,18 +112,19 @@ describe('endpoint cli', function () {
     });
   });
 
-  it("set TLS params", function (done) {
-    createEndpoint('test-set-endpoint').subscribe(() => {
+  it('set TLS params', (done) => {
+    const endpointName = 'test-set-endpoint';
+    createEndpoint(endpointName).subscribe(() => {
       routerCli([
         'endpoint', 'set',
-        '--endpointName', 'test-set-endpoint',
+        '--endpointName', endpointName,
         '--tls-key', './test/testfile',
         '--tls-cert', './test/testfile',
-        '--tls-chain', './test/testfile'
+        '--tls-chain', './test/testfile',
       ]).subscribe((str) => {
         assert.equal(str, 'endpoint options were set');
         listEndpoints().subscribe((list) => {
-          const endpoint = list.find(e => e.name === 'test-set-endpoint');
+          const endpoint = list.find(e => e.name === endpointName);
           assert.isDefined(endpoint.tls);
           assert.equal(endpoint.tls.tlsCert, 'test');
           assert.equal(endpoint.tls.tlsChain, 'test');
@@ -118,22 +135,23 @@ describe('endpoint cli', function () {
     });
   });
 
-  it("unset TLS params", function (done) {
-    createEndpoint('test-unset-endpoint').subscribe(() => {
+  it('unset TLS params', (done) => {
+    const endpointName = 'test-unset-endpoint';
+    createEndpoint(endpointName).subscribe(() => {
       routerCli([
         'endpoint', 'set',
-        '--endpointName', 'test-unset-endpoint',
+        '--endpointName', endpointName,
         '--tls-key', './test/testfile',
         '--tls-cert', './test/testfile',
-        '--tls-chain', './test/testfile'
+        '--tls-chain', './test/testfile',
       ]).subscribe(() => {
         routerCli([
           'endpoint', 'unset',
-          '--endpointName', 'test-unset-endpoint',
+          '--endpointName', endpointName,
         ]).subscribe((str) => {
           assert.equal(str, 'endpoint options were unset');
           listEndpoints().subscribe((list) => {
-            const endpoint = list.find(e => e.name === 'test-unset-endpoint');
+            const endpoint = list.find(e => e.name === endpointName);
             assert.isDefined(endpoint.tls);
             assert.isNull(endpoint.tls.tlsCert);
             assert.isNull(endpoint.tls.tlsChain);
@@ -145,7 +163,7 @@ describe('endpoint cli', function () {
     });
   });
 
-  it("adds node to endpoint", function (done) {
+  it('adds node to endpoint', (done) => {
     const endpointName = 'test-nodes-add-endpoint';
     const nodeName = 'test-node';
     createEndpoint(endpointName).subscribe(() => {
@@ -160,7 +178,7 @@ describe('endpoint cli', function () {
     });
   });
 
-  it("removes node from endpoint", function (done) {
+  it('removes node from endpoint', (done) => {
     const endpointName = 'test-nodes-remove-endpoint';
     const nodeName = 'test-node';
     createEndpoint(endpointName).subscribe(() => {
@@ -170,20 +188,20 @@ describe('endpoint cli', function () {
           routerCli([
             'endpoint', 'nodes', 'remove',
             '--endpointName', endpointName,
-            '--nodeName', nodeName
+            '--nodeName', nodeName,
           ]).subscribe((str) => {
             assert.equal(str, 'node was removed from endpoint');
-            listNodesForEndpoint(endpointName).subscribe((list) => {
-              assert.equal(list.length, 0);
+            listNodesForEndpoint(endpointName).subscribe((newList) => {
+              assert.equal(newList.length, 0);
               done();
             });
-          })
+          });
         });
       });
     });
   });
 
-  it("adds binding to node", function (done) {
+  it('adds binding to node', (done) => {
     const endpointName = 'test-nodes-add-binding';
     const nodeName = 'test-node';
     createEndpoint(endpointName).subscribe(() => {
@@ -203,18 +221,18 @@ describe('endpoint cli', function () {
     });
   });
 
-  it("removes binding from node", function (done) {
+  it('removes binding from node', (done) => {
     const endpointName = 'test-nodes-remove-binding';
     const nodeName = 'test-node';
     createEndpoint(endpointName).subscribe(() => {
       createNode(endpointName, nodeName).subscribe(() => {
-        addBindToNode(endpointName, nodeName).subscribe((str) => {
+        addBindToNode(endpointName, nodeName).subscribe(() => {
           routerCli([
             'endpoint', 'node', 'remove',
             '--endpointName', endpointName,
             '--nodeName', nodeName,
             '--ip', '123.123.123.123',
-            '--port', '12345'
+            '--port', '12345',
           ]).subscribe((str) => {
             assert.equal(str, 'bind was removed');
             listNodesForEndpoint(endpointName).subscribe((nodes) => {
@@ -228,5 +246,4 @@ describe('endpoint cli', function () {
       });
     });
   });
-
 });
