@@ -6,12 +6,10 @@ import * as winston from 'winston';
 
 import { Endpoint } from './endpoint';
 import { TargetRouter } from './target-router';
-import * as net from "net";
 
 type Server = http.Server | https.Server;
 
 interface EndpointServers {
-
   endpoint: Endpoint;
   servers: Server[];
 }
@@ -27,7 +25,7 @@ export class ServerManager {
     this.targetRouter = targetRouter;
   }
 
-  updateEndpoints(endpoints: Endpoint[]): Rx.Observable<string> {
+  public updateEndpoints(endpoints: Endpoint[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
       endpoints.forEach(endpoint => {
         if (this.endpointsConfig.has(endpoint.name)) {
@@ -43,20 +41,20 @@ export class ServerManager {
     });
   }
 
-  private shutDownEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>) {
+  private shutDownEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>): void {
     const servers = this.endpointsConfig.get(endpoint.name).servers;
     servers.forEach((server: http.Server | https.Server) => {
       if (server.listening) {
         const address = server.address();
         server.close(() => {
-          observer.next(`${address.address}:${address.port} : server closed`)
+          observer.next(`${address.address}:${address.port} : server closed`);
         });
       }
     });
-    this.endpointsConfig.delete(endpoint.name)
+    this.endpointsConfig.delete(endpoint.name);
   }
 
-  private spinUpEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>) {
+  private spinUpEndpoint(endpoint: Endpoint, observer: Rx.Observer<string>): void {
     const servers: Server[] = [];
     endpoint.nodes.forEach(node => {
       node.listBinds().forEach(bind => {
@@ -82,14 +80,14 @@ export class ServerManager {
         }
       });
     });
-    this.endpointsConfig.set(endpoint.name, { endpoint: endpoint, servers: servers })
+    this.endpointsConfig.set(endpoint.name, { endpoint: endpoint, servers: servers });
   }
 
-  private createTlsConfig(endpoint: Endpoint) {
+  private createTlsConfig(endpoint: Endpoint): any {
     return endpoint.tls && endpoint.tls.tlsKey && endpoint.tls.tlsCert && {
       key: endpoint.tls.tlsKey,
       cert: endpoint.tls.tlsCert,
       ca: endpoint.tls.tlsChain,
-    }
+    };
   }
 }

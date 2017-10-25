@@ -36,9 +36,7 @@ describe('router', function (): void {
     });
   });
 
-  it('reacts on adding and removing endpoints', function (done) {
-    this.timeout(5000);
-
+  it('reacts on adding and removing endpoints', (done) => {
     let uuid = Uuid.v4().toString();
 
     function routerCli(args: string[]): Rx.Observable<string> {
@@ -49,11 +47,11 @@ describe('router', function (): void {
       return router.cli(['start']);
     }
 
-    function addNewEndpoint(num: number): Rx.Observable<Endpoint> {
-      const endpointName = 'testEndpoint' + num;
-      const nodeName = 'testNode' + num;
+    function addNewEndpoint(count: number): Rx.Observable<Endpoint> {
+      const endpointName = 'testEndpoint' + count;
+      const nodeName = 'testNode' + count;
       const ip = '127.0.0.1';
-      const port = '808' + (num - 1);
+      const port = '808' + (count - 1);
       return Rx.Observable.create((observer: Rx.Observer<Endpoint>) => {
         routerCli([
           'endpoint', 'add',
@@ -69,21 +67,21 @@ describe('router', function (): void {
               '--endpointName', endpointName,
               '--nodeName', nodeName,
               '--ip', ip,
-              '--port', port
+              '--port', port,
             ]).subscribe(() => {
               const endpoint = new Endpoint(endpointName, log);
               const node = endpoint.addNode(nodeName);
               node.addBind(new IpPort(IPAddress.parse(ip), parseInt(port), log));
-              observer.next(endpoint)
-            })
-          })
+              observer.next(endpoint);
+            });
+          });
         });
       });
     }
 
     function checkIsAccessible(endpoint: Endpoint): Rx.Observable<void> {
       return Rx.Observable.create((observer: Rx.Observer<void>) => {
-        function ping(attempts: number) {
+        function ping(attempts: number): void {
           const ipPort = endpoint.listNodes()[0].listBinds()[0];
           rq.get({
             uri: `http://${ipPort.toString()}/`,
@@ -119,7 +117,7 @@ describe('router', function (): void {
       });
     }
 
-    function checkRemoveEndpoints(count: number) {
+    function checkRemoveEndpoints(count: number): Rx.Observable<void> {
       return Rx.Observable.create((observer: Rx.Observer<void>) => {
         routerCli(['endpoint', 'list', '--json']).subscribe((strList) => {
           const list = JSON.parse(strList).map((e: any) => Endpoint.loadFrom(e, log));
@@ -132,24 +130,26 @@ describe('router', function (): void {
                 timeout: 100,
               }).on('error', (err) => {
                 console.log(err);
-              }).on('complete', (resp) => {
-                if (count === 1) done();
-                else checkRemoveEndpoints(count - 1).subscribe(() => observer.next(null));
-              })
+              }).on('complete', () => {
+                if (count === 1) {
+                  done();
+                } else {
+                  checkRemoveEndpoints(count - 1).subscribe(() => observer.next(null));
+                }
+              });
             });
           });
-        })
+        });
       });
     }
 
-    let count = 10;
+    let num = 10;
     startRouter().subscribe(() => {
-      checkAddEndpoints(count).subscribe(() => {
-        checkRemoveEndpoints(count).subscribe(() => {
+      checkAddEndpoints(num).subscribe(() => {
+        checkRemoveEndpoints(num).subscribe(() => {
           // else count--;
         });
       });
     });
   });
 });
-

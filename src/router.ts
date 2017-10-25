@@ -26,7 +26,7 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger
     infoSource.start('endpoints').subscribe((res: any) =>
       infoSource.onNext(res, Endpoint.loadFrom).subscribe(endpoints => {
         serverManager.updateEndpoints(endpoints).subscribe(result => {
-          logger.info('endpoints configuration updated', result)
+          logger.info('endpoints configuration updated', result);
         }, observer.error);
       }, observer.error));
 
@@ -117,16 +117,8 @@ export class Route {
   public rule: string;
   public endpointName: string;
 
-  constructor(name: string, endpointName: string, order: number, rule: string, log: winston.LoggerInstance) {
-    this.name = name;
-    this.endpointName = endpointName;
-    this.log = log;
-    this.order = order;
-    this.rule = rule;
-  }
-
-  static cli(y: yargs.Argv, etc: etcd.EtcdObservable, upset: etcd.Upset,
-             log: winston.LoggerInstance, obs: Rx.Observer<string>) {
+  public static cli(y: yargs.Argv, etc: etcd.EtcdObservable, upset: etcd.Upset,
+                    log: winston.LoggerInstance, obs: Rx.Observer<string>): void {
     y.command('route', 'route commands', () => {
       const opRouteName = {
         'routeName': {
@@ -161,10 +153,10 @@ export class Route {
                   out.next(route.toObject());
                 }
               } catch (e) {
-                obs.error(e)
+                obs.error(e);
               }
             }).subscribe(() => {
-              obs.next('route was added')
+              obs.next('route was added');
             }, obs.error);
           }, obs.error);
         })
@@ -176,21 +168,20 @@ export class Route {
               } else {
                 const routes = resp.node.nodes.map(n => {
                   const value = JSON.parse(n.value);
-                  return new Route(value.name, value.endpointName, value.order, value.rule, log).toObject()
+                  return new Route(value.name, value.endpointName, value.order, value.rule, log).toObject();
                 });
                 obs.next(JSON.stringify(routes));
               }
             } catch (e) {
               obs.error(e);
             }
-          }, obs.error)
+          }, obs.error);
         })
         .command('remove', 'remove a route', opRouteName, (argv) => {
           etc.delete(`routes/${argv.routeName}`).subscribe(resp => {
             if (resp.isErr()) {
               obs.error(resp.err);
-            }
-            else {
+            } else {
               obs.next('route was removed');
             }
           });
@@ -208,21 +199,29 @@ export class Route {
             } catch (e) {
               obs.error(e);
             }
-          }, obs.error)
+          }, obs.error);
         });
-    })
+    });
   }
 
-  toObject() {
+  constructor(name: string, endpointName: string, order: number, rule: string, log: winston.LoggerInstance) {
+    this.name = name;
+    this.endpointName = endpointName;
+    this.log = log;
+    this.order = order;
+    this.rule = rule;
+  }
+
+  public toObject(): any {
     return {
       name: this.name,
       endpointName: this.endpointName,
       order: this.order,
       rule: this.rule,
-    }
+    };
   }
 
-  isApplicable(req: http.IncomingMessage, endpointName: string): boolean {
+  public isApplicable(req: http.IncomingMessage, endpointName: string): boolean {
     return this.endpointName === endpointName;
   }
 }

@@ -2,7 +2,6 @@ import * as http from 'http';
 import * as etcd from 'promise-etcd';
 import * as Rx from 'rxjs';
 import * as rq from 'request';
-import * as url from 'url';
 import * as yargs from 'yargs';
 import * as winston from 'winston';
 import { Endpoint, IpPort } from './endpoint';
@@ -19,53 +18,57 @@ export class TargetRouter {
     this.routes = [];
   }
 
-  route(req: http.IncomingMessage, res: http.ServerResponse, endpoint: Endpoint): void {
+  public route(req: http.IncomingMessage, res: http.ServerResponse, endpoint: Endpoint): void {
     this.findTarget(req, endpoint.name).subscribe((apply: Apply) => {
       apply(req, res);
-    })
+    });
   }
 
   private findTarget(req: http.IncomingMessage, endpointName: string): Rx.Observable<Apply> {
     return Rx.Observable.create((observer: Rx.Observer<Apply>) => {
-      this.getRoute(req, observer, endpointName) || TargetRouter.internalError(observer);
+      const applyRoute = this.hasRoute(req, endpointName) || this.internalError();
+      observer.next(applyRoute);
     });
   }
 
-  private getRoute(req: http.IncomingMessage, observer: Rx.Observer<Apply>, endpointName: string): any {
-    const route = this.routes.find(route => route.isApplicable(req, endpointName));
-    if (!route) return null;
+  private hasRoute(req: http.IncomingMessage, endpointName: string): Apply {
+    const route = this.routes.find(r => r.isApplicable(req, endpointName));
+    if (!route) {
+      return null;
+    }
     const targetNameFunc = new Function('req', route.rule);
     const targetName = targetNameFunc(req);
-    const target = this.targets.find(target => target.name === targetName);
-    if (!target) return null;
-    observer.next((request, response) => {
+    const target = this.targets.find(t => t.name === targetName);
+    if (!target) {
+      return null;
+    }
+    return (request, response) => {
       const targetHost = target.hosts[Math.floor(Math.random() * target.hosts.length)];
       const url = 'http://' + targetHost.toString() + request.url;
       request.pipe(rq(url)).pipe(response);
-    });
-    return url;
+    };
   }
 
-  private static internalError(observer: Rx.Observer<Apply>) {
-    observer.next((req, res) => {
-      res.statusCode = 500;
-      res.write('500 Internal Server Error');
-      res.end();
-    });
-  }
-
-  updateTargets(targets: Target[]): Rx.Observable<string> {
+  public updateTargets(targets: Target[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
       this.targets = targets;
       observer.next(JSON.stringify(targets.map(t => t.toObject())));
     });
   }
 
-  updateRoutes(routes: Route[]): Rx.Observable<string> {
+  public updateRoutes(routes: Route[]): Rx.Observable<string> {
     return Rx.Observable.create((observer: Rx.Observer<string>) => {
       this.routes = routes;
       observer.next(JSON.stringify(routes.map(r => r.toObject())));
     });
+  }
+
+  private internalError(): Apply {
+    return (req, res) => {
+      res.statusCode = 500;
+      res.write('500 Internal Server Error');
+      res.end();
+    };
   }
 }
 
@@ -79,14 +82,8 @@ export class Target {
   public hosts: IpPort[];
   public metadata: any;
 
-  constructor(targetName: string, log: winston.LoggerInstance) {
-    this.name = targetName;
-    this.log = log;
-    this.hosts = [];
-  }
-
-  static cli(y: yargs.Argv, etc: etcd.EtcdObservable, upset: etcd.Upset,
-             log: winston.LoggerInstance, obs: Rx.Observer<string>) {
+  public static cli(y: yargs.Argv, etc: etcd.EtcdObservable, upset: etcd.Upset,
+                    log: winston.LoggerInstance, obs: Rx.Observer<string>): void {
     y.command('target', 'target commands', () => {
       const opTargetName = {
         'targetName': {
@@ -113,10 +110,10 @@ export class Target {
                   out.next(target.toObject());
                 }
               } catch (e) {
-                obs.error(e)
+                obs.error(e);
               }
             }).subscribe(() => {
-              obs.next('target was added')
+              obs.next('target was added');
             });
           });
         })
@@ -132,14 +129,13 @@ export class Target {
             } catch (e) {
               obs.error(e);
             }
-          }, obs.error)
+          }, obs.error);
         })
         .command('remove', 'removes a target', opTargetName, (argv) => {
           etc.delete(`targets/${argv.targetName}`).subscribe(resp => {
             if (resp.isErr()) {
               obs.error(resp.err);
-            }
-            else {
+            } else {
               obs.next('target was removed');
             }
           });
@@ -203,14 +199,16 @@ export class Target {
             .command('list', 'list hosts', opTargetName, (argv) => {
               etc.getJson(`targets/${argv.targetName}`).subscribe((resp) => {
                 if (resp.isErr()) {
-                  obs.error(resp.err)
+                  obs.error(resp.err);
                 } else {
                   const target = Target.loadFrom(resp.value, log);
-                  if (!target.hosts) target.hosts = [];
+                  if (!target.hosts) {
+                    target.hosts = [];
+                  }
                   const hs = target.hosts.map((h: IpPort) => h.toString());
                   obs.next(JSON.stringify(hs));
                 }
-              })
+              });
             })
             .command('remove', 'remove host', opHost, (argv) => {
               const host = IpPort.loadFrom({ ip: argv.ip, port: argv.port }, log);
@@ -222,27 +220,33 @@ export class Target {
                 const target = Target.loadFrom(targetJson, log);
                 const h = target.removeHost(host);
                 if (!h) {
-                  obs.error('host does not exist')
+                  obs.error('host does not exist');
                 } else {
                   out.next(target.toObject());
                 }
               }).subscribe(() => {
                 obs.next('host was removed from target');
-              })
+              });
             });
           return hosts;
         });
     });
   }
 
-  static loadFrom(obj: any, log: winston.LoggerInstance): Target {
+  public static loadFrom(obj: any, log: winston.LoggerInstance): Target {
     const ret = new Target(obj.name, log);
     (obj.hosts || []).forEach((host: any) => ret.addHost(IpPort.loadFrom(host, log)));
     ret.metadata = obj.metadata || {};
     return ret;
   }
 
-  toObject(): any {
+  constructor(targetName: string, log: winston.LoggerInstance) {
+    this.name = targetName;
+    this.log = log;
+    this.hosts = [];
+  }
+
+  public toObject(): any {
     return {
       name: this.name,
       hosts: this.hosts.map(h => h && h.toObject()),
@@ -250,12 +254,12 @@ export class Target {
     };
   }
 
-  addHost(host: IpPort): IpPort {
+  public addHost(host: IpPort): IpPort {
     this.hosts.push(host);
     return host;
   }
 
-  removeHost(host: IpPort): IpPort {
+  public removeHost(host: IpPort): IpPort {
     const filtered = this.hosts.filter(h => !h.equals(host));
     if (filtered.length === this.hosts.length) {
       this.log.error('host does not exist');
