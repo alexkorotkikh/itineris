@@ -54,7 +54,6 @@
         "jsx-double",
         "avoid-escape"
       ],
-      "radix": true,
       "semicolon": [true, "always"],
       "typedef": [
         true,

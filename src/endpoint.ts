@@ -17,7 +17,7 @@ export class IpPort {
       return null;
     }
     const port = parseInt(obj.port, 10);
-    if (!(0 <= port && port << 65536)) {
+    if (!(0 <= port && port <= 65536)) {
       log.error('port not in range', port);
       return null;
     }
@@ -34,12 +34,12 @@ export class IpPort {
     return this.ip.eq(oth.ip) && oth.port == this.port;
   }
 
-  toObject(): any {
-    return { ip: this.ip.to_s(), port: this.port }
+  public toObject(): any {
+    return { ip: this.ip.to_s(), port: this.port };
   }
 
-  toString(): string {
-    return `${this.ip.to_s()}:${this.port}`
+  public toString(): string {
+    return `${this.ip.to_s()}:${this.port}`;
   }
 }
 
@@ -61,72 +61,72 @@ export class Node {
           required: true
         }
       }, opNodeName);
-      const node = yargs.usage('$0 service node <cmd> [args]');
-      node.command('add', 'add ipport by name', opIpPort, (argv) => {
+      const nodeCli = yargs.usage('$0 service node <cmd> [args]');
+      nodeCli.command('add', 'add ipport by name', opIpPort, (argv) => {
         upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
           const endpoint = Endpoint.loadFrom(endpointJson, log);
           const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
           if (!node) {
-            obs.error('node does not exist')
+            obs.error('node does not exist');
           } else {
             try {
-              const ip = IPAddress.parse(argv.ip);
-              const port = parseInt(argv.port);
-              const bind = node.addBind(new IpPort(ip, port, log));
+              const ipPort = IpPort.loadFrom({ ip: argv.ip, port: argv.port }, log);
+              const bind = node.addBind(ipPort);
               if (!bind) {
                 obs.error('bind was not added');
               } else {
                 out.next(endpoint.toObject());
               }
             } catch (e) {
-              obs.error(e)
+              obs.error(e);
             }
           }
         }).subscribe(() => {
-          obs.next('bind added to node')
+          obs.next('bind added to node');
         });
       });
-      node.command('list', 'list ipport by name', opNodeName, (argv) => {
+      nodeCli.command('list', 'list ipport by name', opNodeName, (argv) => {
         etc.getJson(`endpoints/${argv.endpointName}`).subscribe((resp) => {
           if (resp.isErr()) {
-            obs.error(resp.err)
+            obs.error(resp.err);
           } else {
             const endpoint = resp.value;
-            if (!endpoint.nodes) endpoint.nodes = [];
+            if (!endpoint.nodes) {
+              endpoint.nodes = [];
+            }
             const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
             if (!node) {
-              obs.error('node does not exist')
+              obs.error('node does not exist');
             } else {
               obs.next(node.binds);
             }
           }
         });
       });
-      node.command('remove', 'remove ipport by name', opIpPort, (argv) => {
+      nodeCli.command('remove', 'remove ipport by name', opIpPort, (argv) => {
         upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
           try {
             const endpoint = Endpoint.loadFrom(endpointJson, log);
             const node = endpoint.nodes.find((n: any) => n.name === argv.nodeName);
             if (!node) {
-              obs.error('node does not exist')
+              obs.error('node does not exist');
             } else {
               const bind = new IpPort(IPAddress.parse(argv.ip), parseInt(argv.port), log);
               const removedBind = node.removeBind(bind);
               if (!removedBind) {
-                obs.error('bind does not exist')
+                obs.error('bind does not exist');
               } else {
                 out.next(endpoint.toObject());
               }
             }
-          }
-          catch (e) {
+          } catch (e) {
             console.log(e);
           }
         }).subscribe(() => {
           obs.next('bind was removed');
         }, err => obs.error(err));
       });
-      return node;
+      return nodeCli;
     });
   }
 
@@ -169,11 +169,11 @@ export class Node {
     return this;
   }
 
-  toObject(): any {
-    return { name: this.name, binds: this.binds.map(b => b.toObject()) }
+  public toObject(): any {
+    return { name: this.name, binds: this.binds.map(b => b.toObject()) };
   }
 
-  equals(other: Node): boolean {
+  public equals(other: Node): boolean {
     if (this.name !== other.name) {
       return false;
     }
@@ -207,7 +207,7 @@ export class Tls {
     this.log = log;
   }
 
-  toObject(): any {
+  public toObject(): any {
     return {
       tlsChain: this.tlsChain,
       tlsCert: this.tlsCert,
@@ -215,7 +215,7 @@ export class Tls {
     };
   }
 
-  equals(other: Tls): boolean {
+  public equals(other: Tls): boolean {
     return this.tlsKey === other.tlsKey &&
       this.tlsCert === other.tlsCert &&
       this.tlsChain === other.tlsChain;
@@ -243,7 +243,7 @@ export class Endpoint {
           require: true
         }
       }, opEndpointName);
-      const endpoints = yargs.usage('$0 endpoint <cmd> [args]')
+      const endpointsCli = yargs.usage('$0 endpoint <cmd> [args]')
         .command('add', 'adds a endpoint', opEndpointName, (argv) => {
           etc.mkdir('endpoints').subscribe(() => {
             upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
@@ -255,10 +255,10 @@ export class Endpoint {
                   out.next(endpoint.toObject());
                 }
               } catch (e) {
-                obs.error(e)
+                obs.error(e);
               }
             }).subscribe(() => {
-              obs.next('endpoint was added')
+              obs.next('endpoint was added');
             }, obs.error);
           }, obs.error);
         })
@@ -274,14 +274,13 @@ export class Endpoint {
             } catch (e) {
               obs.error(e);
             }
-          }, obs.error)
+          }, obs.error);
         })
         .command('remove', 'remove a endpoint', opEndpointName, (argv) => {
           etc.delete(`endpoints/${argv.endpointName}`).subscribe(resp => {
             if (resp.isErr()) {
               obs.error(resp.err);
-            }
-            else {
+            } else {
               obs.next('endpoint was removed');
             }
           });
@@ -328,8 +327,8 @@ export class Endpoint {
           }, console.error);
         })
         .command('nodes', 'handle nodes', (): yargs.Argv => {
-          const nodes = yargs.usage('$0 service nodes <cmd> [args]');
-          nodes.command('add', 'add node by name', opNodeName, (argv) => {
+          const nodesCli = yargs.usage('$0 service nodes <cmd> [args]');
+          nodesCli.command('add', 'add node by name', opNodeName, (argv) => {
             upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
               const endpoint = Endpoint.loadFrom(endpointJson, log);
               if (endpoint.nodes.find((n: any) => n.name === argv.nodeName)) {
@@ -342,37 +341,39 @@ export class Endpoint {
               obs.next('node was added to endpoint');
             });
           });
-          nodes.command('list', 'list node by name', opEndpointName, (argv) => {
+          nodesCli.command('list', 'list node by name', opEndpointName, (argv) => {
             etc.getJson(`endpoints/${argv.endpointName}`).subscribe((resp) => {
               if (resp.isErr()) {
-                obs.error(resp.err)
+                obs.error(resp.err);
               } else {
                 const endpoint = Endpoint.loadFrom(resp.value, log);
-                if (!endpoint.nodes) endpoint.nodes = [];
+                if (!endpoint.nodes) {
+                  endpoint.nodes = [];
+                }
                 const nodes = endpoint.nodes.map(n => n.toObject());
                 obs.next(JSON.stringify(nodes));
               }
-            })
+            });
           });
-          nodes.command('remove', 'add node by name', opNodeName, (argv) => {
+          nodesCli.command('remove', 'add node by name', opNodeName, (argv) => {
             upset.upSet(`endpoints/${argv.endpointName}`, (endpointJson, out) => {
               const endpoint = Endpoint.loadFrom(endpointJson, log);
               const node = endpoint.removeNode(argv.nodeName);
               if (!node) {
-                obs.error('node does not exist')
+                obs.error('node does not exist');
               } else {
                 out.next(endpoint.toObject());
               }
             }).subscribe(() => {
               obs.next('node was removed from endpoint');
-            })
+            });
           });
-          return nodes;
+          return nodesCli;
         });
 
-      Node.cli(endpoints, opNodeName, etc, upset, log, obs);
+      Node.cli(endpointsCli, opNodeName, etc, upset, log, obs);
 
-      return endpoints;
+      return endpointsCli;
     });
   }
 
@@ -414,15 +415,15 @@ export class Endpoint {
     return found;
   }
 
-  toObject(): any {
+  public toObject(): any {
     return {
       name: this.name,
       nodes: this.nodes.map(n => n.toObject()),
       tls: (this.tls && this.tls.toObject()) || {},
-    }
+    };
   }
 
-  equals(other: Endpoint): boolean {
+  public equals(other: Endpoint): boolean {
     if (this.name !== other.name) {
       return false;
     }

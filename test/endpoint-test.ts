@@ -51,13 +51,13 @@ describe('endpoint cli', () => {
     ]);
   }
 
-  function addBindToNode(endpointName: string, nodeName: string): Rx.Observable<string> {
+  function addBindToNode(endpointName: string, nodeName: string, ip?: string, port?: string): Rx.Observable<string> {
     return routerCli([
       'endpoint', 'node', 'add',
       '--endpointName', endpointName,
       '--nodeName', nodeName,
-      '--ip', '123.123.123.123',
-      '--port', '12345',
+      '--ip', ip || '123.123.123.123',
+      '--port', port || '12345',
     ]);
   }
 
@@ -178,6 +178,22 @@ describe('endpoint cli', () => {
     });
   });
 
+  it('does\'t add node with duplicated name', (done) => {
+    const endpointName = 'test-nodes-add-duplicate-endpoint';
+    const nodeName = 'test-node';
+    createEndpoint(endpointName).subscribe(() => {
+      createNode(endpointName, nodeName).subscribe(() => {
+        createNode(endpointName, nodeName).subscribe(console.error, (str) => {
+          assert.equal(str, 'node already exist');
+          listNodesForEndpoint(endpointName).subscribe((nodes) => {
+            assert.equal(nodes.length, 1);
+            done();
+          });
+        });
+      });
+    });
+  });
+
   it('removes node from endpoint', (done) => {
     const endpointName = 'test-nodes-remove-endpoint';
     const nodeName = 'test-node';
@@ -215,6 +231,28 @@ describe('endpoint cli', () => {
             assert.equal(node.listBinds()[0].ip.to_s(), '123.123.123.123');
             assert.equal(node.listBinds()[0].port, 12345);
             done();
+          });
+        });
+      });
+    });
+  });
+
+  it('doesn\'t add binding woth invalid ip or port', (done) => {
+    const endpointName = 'test-nodes-add-ivalid-binding';
+    const nodeName = 'test-node';
+    createEndpoint(endpointName).subscribe(() => {
+      createNode(endpointName, nodeName).subscribe(() => {
+        addBindToNode(endpointName, nodeName, '256.256.256.256').subscribe(console.error, (str) => {
+          console.log(str);
+          assert.equal(str, 'bind was not added');
+          addBindToNode(endpointName, nodeName, '123.123.123.123', '77777').subscribe(console.error, (str2) => {
+            assert.equal(str2, 'bind was not added');
+            listNodesForEndpoint(endpointName).subscribe((nodes) => {
+              const node = nodes.find(n => n.name === nodeName);
+              assert.isDefined(node);
+              assert.equal(node.listBinds().length, 0);
+              done();
+            });
           });
         });
       });
