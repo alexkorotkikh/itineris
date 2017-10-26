@@ -45,7 +45,7 @@
     "tag": "next"
   },
   "scripts": {
-    "test": "mocha --require dist/test/etcd-daemon.js dist/test/*-test.js"
+    "test": "mocha --require dist/test/etcd-daemon.js dist/test/*-test.js --exit"
   },
   "config": {
     "commitizen": {

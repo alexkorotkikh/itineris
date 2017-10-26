@@ -145,7 +145,7 @@ export class Target {
           try {
             metadata = JSON.parse(argv.metadata);
           } catch (e) {
-            obs.error(e);
+            obs.error('metadata is invalid');
             return;
           }
           upset.upSet(`targets/${argv.targetName}`, (targetJson: any, out: Rx.Subject<any>) => {
@@ -156,7 +156,7 @@ export class Target {
             obs.next('target options were set');
           });
         })
-        .command('unset', 'options to a target', opTargetOptions, (argv) => {
+        .command('unset', 'options to a target', opTargetName, (argv) => {
           upset.upSet(`targets/${argv.targetName}`, (targetJson: any, out: Rx.Subject<any>) => {
             const target = Target.loadFrom(targetJson, log);
             target.metadata = {};
@@ -181,7 +181,7 @@ export class Target {
           hosts.command('add', 'add host', opHost, (argv) => {
             const host = IpPort.loadFrom({ ip: argv.ip, port: argv.port }, log);
             if (!host) {
-              obs.error(new Error('ip and/or port not valid'));
+              obs.error('ip and/or port are not valid');
               return;
             }
             upset.upSet(`targets/${argv.targetName}`, (targetJson: any, out: Rx.Subject<any>) => {
