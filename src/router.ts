@@ -162,18 +162,14 @@ export class Route {
         })
         .command('list', 'list all routes', {}, () => {
           etc.getRaw('routes', { recursive: true }).subscribe(resp => {
-            try {
-              if (resp.isErr()) {
-                obs.error(JSON.stringify(resp.err));
-              } else {
-                const routes = resp.node.nodes.map(n => {
-                  const value = JSON.parse(n.value);
-                  return new Route(value.name, value.endpointName, value.order, value.rule, log).toObject();
-                });
-                obs.next(JSON.stringify(routes));
-              }
-            } catch (e) {
-              obs.error(e);
+            if (resp.isErr()) {
+              obs.error(JSON.stringify(resp.err));
+            } else {
+              const routes = resp.node.nodes.map(n => {
+                const value = JSON.parse(n.value);
+                return new Route(value.name, value.endpointName, value.order, value.rule, log).toObject();
+              });
+              obs.next(JSON.stringify(routes));
             }
           }, obs.error);
         })

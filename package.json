@@ -45,6 +45,11 @@
     "tag": "next"
   },
   "scripts": {
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean",
+    "build": "tsc",
+    "pretest": "npm run build",
+    "lint": "tslint --project .",
     "test": "mocha --require dist/test/etcd-daemon.js dist/test/*-test.js --exit"
   },
   "config": {
