@@ -27,8 +27,8 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger
       infoSource.onNext(res, Endpoint.loadFrom).subscribe(endpoints => {
         serverManager.updateEndpoints(endpoints).subscribe(result => {
           logger.info('endpoints configuration updated', result);
-        }, observer.error);
-      }, observer.error));
+        });
+      }));
 
     infoSource.start('targets').subscribe((res: any) =>
       infoSource.onNext(res, Target.loadFrom).subscribe(targets =>
@@ -38,27 +38,12 @@ function createStartHandler(y: yargs.Argv, observer: Rx.Observer<string>, logger
       ));
 
     infoSource.start('routes').subscribe((res: any) =>
-      infoSource.onNext(res, (json, log) => {
-        return new Route(json.name, json.endpointName, json.order, json.rule, log);
-      }).subscribe(routes =>
+      infoSource.onNext(res, Route.loadFrom).subscribe(routes =>
         targetRouter.updateRoutes(routes).subscribe(result => {
           logger.info('routes configuration updated', result);
         })
       ));
     observer.next('Router started');
-  });
-}
-
-function jsonOrText(_yargs: any): any {
-  return _yargs.option('json', {
-    'default': false,
-    describe: 'json output'
-  }).option('text', {
-    'default': true,
-    describe: 'text output'
-  }).option('notitle', {
-    'default': false,
-    describe: 'suppress text title line'
   });
 }
 
@@ -80,17 +65,12 @@ export function cli(args: string[]): Rx.Observable<string> {
     const hack = yargs as any;
     const y = (new hack()).usage('$0 <cmd> [args]');
 
-    y.option('logLevel', {
-      describe: 'logLevel ala winston',
-      'default': 'info'
-    });
-    jsonOrText(y);
-    etcdOptions(y);
 
     const logger = new (winston.Logger)({
       transports: [new (winston.transports.Console)()]
     });
 
+    etcdOptions(y);
     const cfg = etcd.Config.start([
       '--etcd-cluster-id', y.argv.etcdClusterId,
       '--etcd-app-id', y.argv.etcdAppId,
@@ -198,6 +178,10 @@ export class Route {
           }, obs.error);
         });
     });
+  }
+
+  public static loadFrom(json: any, log: winston.LoggerInstance): Route {
+    return new Route(json.name, json.endpointName, json.order, json.rule, log);
   }
 
   constructor(name: string, endpointName: string, order: number, rule: string, log: winston.LoggerInstance) {
